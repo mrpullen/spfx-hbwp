@@ -1,0 +1,96 @@
+name: SPFx-HBWP-Build-Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_release:
+        default: true
+        description: 'Create Github Release'
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x]
+    outputs: 
+      majorMinorPatch: ${{ steps.setoutputs.outputs.majorMinorPatch }}
+      semver: ${{ steps.setoutputs.outputs.semver }}
+      
+    steps:
+    
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 7
+      
+    - name: Setup GitVersion
+      uses: gittools/actions/gitversion/setup@v0.9.7
+      with:
+        versionSpec: '5.x'
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        
+    - name: Determine Version
+      id:   gitversion
+      uses: gittools/actions/gitversion/execute@v0.9.7
+    
+    - name: Set outputs
+      id: setoutputs
+      run: |
+        echo "::set-output name=majorMinorPatch::$GITVERSION_MAJORMINORPATCH"
+        echo "::set-output name=semver::$GITVERSION_SEMVER"
+    
+    - name: Build SPFx
+      run: |
+        pnpm install
+        gulp bundle --ship
+        gulp package-solution --ship
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: spfx-fab-40
+        path: ${{ github.workspace }}/**/*.sppkg
+
+  release:
+    runs-on: ubuntu-latest
+    environment: production
+    if: ${{ github.ref_name == 'main' || startsWith(github.ref_name, 'release') || github.event.inputs.create_release }}
+    needs: build
+    steps:
+      
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - uses: actions/download-artifact@v3
+        with:
+          name: spfx-fab-40
+    
+      - name: Create GitHub release
+        uses: ncipollo/release-action@v1.14.0
+        with:
+          name: spfx-fab-40-${{ needs.build.outputs.semVer }}
+          artifacts: ${{ github.workspace }}/**/*.sppkg
+          bodyFile: ".github/workflows/release-template.md"
+          draft: true
+          generateReleaseNotes: true
+          allowUpdates: true
+          replacesArtifacts: true
+          prerelease: ${{ startsWith(github.ref_name, 'release') }}
+          tag: ${{ needs.build.outputs.majorMinorPatch }}
+          commit: ${{ github.ref_name }} 
+          token: ${{ secrets.TOKEN }}
