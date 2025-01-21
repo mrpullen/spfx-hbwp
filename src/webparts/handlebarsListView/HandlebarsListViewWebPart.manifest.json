@@ -1,0 +1,24 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx/client-side-web-part-manifest.schema.json",
+  "id": "44530d97-e32f-4bcc-aad7-7c54864f072a",
+  "alias": "HandlebarsListViewWebPart",
+  "componentType": "WebPart",
+
+  "version": "*",
+  "manifestVersion": 2,
+
+  "requiresCustomScript": false,
+  "supportedHosts": ["SharePointWebPart", "TeamsPersonalApp", "TeamsTab", "SharePointFullPage"],
+  "supportsThemeVariants": true,
+
+  "preconfiguredEntries": [{
+    "groupId": "5c03119e-3074-46fd-976b-c60198311f70", 
+    "group": { "default": "Advanced" },
+    "title": { "default": "handlebars-list-view" },
+    "description": { "default": "handlebars-list-view description" },
+    "officeFabricIconFontName": "Page",
+    "properties": {
+      "template": "<div>{{title}}</div>"
+    }
+  }]
+}

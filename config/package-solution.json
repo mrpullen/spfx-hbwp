@@ -1,0 +1,40 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
+  "solution": {
+    "name": "handlebars-list-view-client-side-solution",
+    "id": "7a797ba6-402f-4bb0-af24-67849c9566bf",
+    "version": "1.0.0.0",
+    "includeClientSideAssets": true,
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "developer": {
+      "name": "",
+      "websiteUrl": "",
+      "privacyUrl": "",
+      "termsOfUseUrl": "",
+      "mpnId": "Undefined-1.18.2"
+    },
+    "metadata": {
+      "shortDescription": {
+        "default": "HandlebarsListView description"
+      },
+      "longDescription": {
+        "default": "HandlebarsListView description"
+      },
+      "screenshotPaths": [],
+      "videoUrl": "",
+      "categories": []
+    },
+    "features": [
+      {
+        "title": "handlebars-list-view Feature",
+        "description": "The feature that activates elements of the handlebars-list-view solution.",
+        "id": "502fe791-e981-4489-a451-4a6b014c21b0",
+        "version": "1.0.0.0"
+      }
+    ]
+  },
+  "paths": {
+    "zippedPackage": "solution/handlebars-list-view.sppkg"
+  }
+}
