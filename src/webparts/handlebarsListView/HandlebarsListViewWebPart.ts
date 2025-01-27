@@ -15,6 +15,7 @@ import { PropertyFieldViewPicker, PropertyFieldViewPickerOrderBy } from '@pnp/sp
 import { PropertyFieldCodeEditor, PropertyFieldCodeEditorLanguages } from '@pnp/spfx-property-controls/lib/PropertyFieldCodeEditor';
 import { spfi, SPFI, SPFx } from '@pnp/sp';
 import { LogLevel, PnPLogging } from "@pnp/logging";
+import { allComponents, provideFluentDesignSystem } from '@fluentui/web-components';
 
 export interface IHandlebarsListViewWebPartProps {
   
@@ -30,6 +31,8 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
 
   protected onInit(): Promise<void> {
     this.sp = spfi().using(SPFx(this.context)).using(PnPLogging(LogLevel.Warning));
+    provideFluentDesignSystem().register(allComponents);
+
     return super.onInit();
   }
 
