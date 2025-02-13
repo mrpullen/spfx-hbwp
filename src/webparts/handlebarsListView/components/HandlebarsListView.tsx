@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import * as React from 'react';
 import type { IHandlebarsListViewProps } from './IHandlebarsListViewProps';
-import * as Handlebars from 'handlebars';
+import Handlebars from "handlebars";
 
+
+import helpers from 'handlebars-helpers'
 import { spfi } from "@pnp/sp";
 import { AssignFrom } from "@pnp/core";
 
@@ -17,6 +19,7 @@ interface IHandlebarsListViewState {
   visible: boolean;
 }
 
+helpers({ handlebars: Handlebars });
 
 export default class HandlebarsListView extends React.Component<IHandlebarsListViewProps, IHandlebarsListViewState> {
   

@@ -13,4 +13,30 @@ build.rig.getTasks = function () {
   return result;
 };
 
+build.configureWebpack.mergeConfig({
+  additionalConfiguration: (generatedConfiguration) => {
+
+
+    generatedConfiguration.resolve.alias = { handlebars: 'handlebars/dist/handlebars.min.js' };
+
+
+    generatedConfiguration.module.rules.push(
+      {
+        test: /\.mjs$/,
+        include: /node_modules/,
+        type: 'javascript/auto'
+      },
+    );
+
+    
+
+    generatedConfiguration.node = {
+      fs: 'empty',
+      readline: 'empty'
+    }
+
+    return generatedConfiguration;
+  },
+});
+
 build.initialize(require('gulp'));
