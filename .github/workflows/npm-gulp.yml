@@ -62,7 +62,7 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v3
       with:
-        name: spfx-fab-40
+        name: spfx-hbwp
         path: ${{ github.workspace }}/**/*.sppkg
 
   release:
@@ -78,12 +78,12 @@ jobs:
       
       - uses: actions/download-artifact@v3
         with:
-          name: spfx-fab-40
+          name: spfx-hbwp
     
       - name: Create GitHub release
         uses: ncipollo/release-action@v1.14.0
         with:
-          name: spfx-fab-40-${{ needs.build.outputs.semVer }}
+          name: spfx-hbwp-${{ needs.build.outputs.semVer }}
           artifacts: ${{ github.workspace }}/**/*.sppkg
           bodyFile: ".github/workflows/release-template.md"
           draft: true
