@@ -33,6 +33,7 @@ Short summary on functionality and used technologies.
 | ------- | ---------------- | --------------- |
 | 1.1     | March 10, 2021   | Update comment  |
 | 1.0     | January 29, 2021 | Initial release |
+| 1.0.1   | February 18, 2025| Added @mrpullen/fluentui-carousel web component |
 
 ## Disclaimer
 
