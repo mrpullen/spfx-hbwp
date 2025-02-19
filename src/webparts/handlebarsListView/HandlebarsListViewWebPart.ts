@@ -17,6 +17,7 @@ import { spfi, SPFI, SPFx } from '@pnp/sp';
 import { LogLevel, PnPLogging } from "@pnp/logging";
 import { allComponents, provideFluentDesignSystem } from '@fluentui/web-components';
 import {Carousel} from '@mrpullen/fluentui-carousel';
+
 export interface IHandlebarsListViewWebPartProps {
   
   sites: Array<IPropertyFieldSite>;
