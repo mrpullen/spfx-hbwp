@@ -33,8 +33,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
 
   protected onInit(): Promise<void> {
     this.sp = spfi().using(SPFx(this.context)).using(PnPLogging(LogLevel.Warning));
-    provideFluentDesignSystem().register(allComponents);
-    provideFluentDesignSystem().register(Carousel);
+    provideFluentDesignSystem().register(allComponents, Carousel);
     return super.onInit();
   }
 

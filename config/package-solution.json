@@ -3,7 +3,7 @@
   "solution": {
     "name": "Handlebars List View Web Part",
     "id": "7a797ba6-402f-4bb0-af24-67849c9566bf",
-    "version": "1.0.0.0",
+    "version": "1.0.0.1",
     "includeClientSideAssets": true,
     "skipFeatureDeployment": true,
     "isDomainIsolated": false,
