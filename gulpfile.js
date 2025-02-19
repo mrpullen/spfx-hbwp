@@ -23,6 +23,7 @@ build.addSuppression(
   `./node_modules/.pnpm/create-frame@1.0.0/node_modules/create-frame/utils.js 3:34-41`
 );
 
+
 build.addSuppression(
   `Critical dependency: *`
 );
