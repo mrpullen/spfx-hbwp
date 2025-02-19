@@ -52,6 +52,78 @@ Short summary on functionality and used technologies.
 
 ## Features
 
+
+## Sample Handlebars
+
+```handlebars
+<style type="text/css">
+    /*https://css-tricks.com/css-only-carousel/*/
+fluentui-carousel {
+  --carousel-controls: #000;
+  --carousel-controls-hover: #022f55;
+  --carousel-controls-active: #022f55;
+  --carousel-controls-hover-background: rgba(255,255,255,.4);
+}
+
+.slide {
+    width: 99%;
+    height:200px;
+    padding-left:50px;
+    padding-right:50px;
+    border:1px solid black;
+}
+
+.slide .content {
+    
+    height:100%;
+}
+
+.fix {
+    display:flex;
+    background-color: red;
+    align-items: center;
+    justify-content: center;
+}
+
+.one {
+    display:flex;
+    flex: 1 0 auto;
+    border: 1px solid black;
+    padding: 3px;
+    height: 100%;
+}
+
+.two {
+    display:flex;
+    flex: 2 0 auto;
+    height: 200px;
+}
+.previous {
+    color:black;
+}
+
+</style>
+
+<fluentui-carousel autoplay="true" autoplay-interval="2000" loop="true">
+     {{#each items }}
+       <div class="slide">
+           <div class="content">{{Title}}</div>
+       </div>
+           
+        
+     {{/each}}
+     
+     <div class="slide fix">
+         <div class="one">First</div>
+         <div class="two">Second</div>
+         <div class="one">Third</div>
+         
+     </div>
+    
+    
+</fluentui-carousel>
+```
+
 Description of the extension that expands upon high-level summary above.
 
 This extension illustrates the following concepts:
