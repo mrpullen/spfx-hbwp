@@ -1,7 +1,7 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
   "solution": {
-    "name": "handlebars-list-view-client-side-solution",
+    "name": "Handlebars List View Web Part",
     "id": "7a797ba6-402f-4bb0-af24-67849c9566bf",
     "version": "1.0.0.0",
     "includeClientSideAssets": true,
