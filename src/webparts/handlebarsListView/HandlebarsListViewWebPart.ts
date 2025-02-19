@@ -16,7 +16,7 @@ import { PropertyFieldCodeEditor, PropertyFieldCodeEditorLanguages } from '@pnp/
 import { spfi, SPFI, SPFx } from '@pnp/sp';
 import { LogLevel, PnPLogging } from "@pnp/logging";
 import { allComponents, provideFluentDesignSystem } from '@fluentui/web-components';
-
+import {Carousel} from '@mrpullen/fluentui-carousel';
 export interface IHandlebarsListViewWebPartProps {
   
   sites: Array<IPropertyFieldSite>;
@@ -25,6 +25,7 @@ export interface IHandlebarsListViewWebPartProps {
   template: string;
 }
 
+
 export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHandlebarsListViewWebPartProps> {
 
   private sp?: SPFI = undefined;
@@ -32,7 +33,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
   protected onInit(): Promise<void> {
     this.sp = spfi().using(SPFx(this.context)).using(PnPLogging(LogLevel.Warning));
     provideFluentDesignSystem().register(allComponents);
-
+    provideFluentDesignSystem().register(Carousel);
     return super.onInit();
   }
 

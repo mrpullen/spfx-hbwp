@@ -1,5 +1,8 @@
 // Place your settings in this file to overwrite default and user settings.
 {
+  "html.customData": [
+    "./node_modules/@ui5/webcomponents/dist/vscode-ui5-custom-data.json"
+  ],
   // Configure glob patterns for excluding files and folders in the file explorer.
   "files.exclude": {
     "**/.git": true,
