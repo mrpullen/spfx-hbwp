@@ -64,6 +64,10 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     const spSite = spfi(site.url).using(AssignFrom(sp.web));
     
     const _list = spSite.web.lists.getById(list);
+
+    const _listInfo = await _list();
+
+
     const views = await _list.views();
     
     console.log(views);
@@ -72,9 +76,15 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
 
     console.log(_viewr);
     const _view = await _viewr.select('ListViewXml')(); //_list.views.getById(view).select('ListViewXml')();
+
+    const expands: Array<string> = [];
+   if(_listInfo.BaseType === 1) {
+      expands.push("File");
+   }
+    
     const items = await _list.getItemsByCAMLQuery({
       ViewXml: _view.ListViewXml
-    });
+    }, ...expands);
 
     return items;
   }
