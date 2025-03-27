@@ -113,6 +113,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
                 }),
                 PropertyFieldViewPicker('view', {
                   label: 'Select a view',
+                  webAbsoluteUrl: this.properties && this.properties.sites && this.properties.sites.length > 0 ? this.properties.sites[0].url : undefined,
                   listId: this.properties.list,
                   selectedView: this.properties.view,
                   orderBy: PropertyFieldViewPickerOrderBy.Title,
