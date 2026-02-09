@@ -1,0 +1,890 @@
+{{!-- 
+  Fluent UI Web Components Sample Template
+  =========================================
+  This template demonstrates all available Fluent UI Web Components
+  that can be used in your Handlebars templates.
+  
+  Available Data:
+  - items: Primary list data from configured list/view
+  - [keyName]: Additional data sources at root level (e.g., announcements, events)
+  - user: Current user profile information
+  - wpId: Web part instance ID (use for unique element IDs when multiple web parts on page)
+--}}
+
+<style>
+  /* Hide M365 Copilot floating button that causes performance issues */
+  [class*="floating-agent"],
+  [class*="FloatingAgent"],
+  [class*="copilot-fab"],
+  [id*="floating-agent"],
+  [id*="FloatingAgent"],
+  .floating-agent-button,
+  .ms-Copilot-FloatingButton {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  .fluent-sample-container {
+    font-family: var(--body-font, 'Segoe UI', sans-serif);
+    padding: 20px;
+    max-width: 1200px;
+  }
+  .component-section {
+    margin-bottom: 32px;
+    padding: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #fafafa;
+  }
+  .component-section h2 {
+    margin-top: 0;
+    color: #0078d4;
+    border-bottom: 2px solid #0078d4;
+    padding-bottom: 8px;
+  }
+  .component-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin: 16px 0;
+    align-items: flex-start;
+  }
+  .component-demo {
+    padding: 16px;
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  .code-hint {
+    background: #f4f4f4;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    color: #666;
+    margin-top: 8px;
+  }
+</style>
+
+<div class="fluent-sample-container" data-wpid="{{wpId}}">
+
+  {{!-- ==================== USER PROFILE SECTION ==================== --}}
+  <div class="component-section">
+    <h2>👤 User Profile (from {{user.displayName}})</h2>
+    <div class="component-row">
+      <fluent-card style="padding: 20px; min-width: 300px;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+          {{#if user.pictureUrl}}
+          <img src="{{user.pictureUrl}}" alt="{{user.displayName}}" 
+               style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;">
+          {{else}}
+          <fluent-avatar name="{{user.displayName}}" style="--avatar-size: 64px;"></fluent-avatar>
+          {{/if}}
+          <div>
+            <div style="font-size: 18px; font-weight: 600;">{{user.displayName}}</div>
+            <div style="color: #666;">{{user.jobTitle}}</div>
+            <div style="color: #888; font-size: 12px;">{{user.department}}</div>
+            <fluent-badge appearance="accent" style="margin-top: 8px;">{{user.email}}</fluent-badge>
+          </div>
+        </div>
+      </fluent-card>
+    </div>
+    <div class="code-hint">Access: \{{user.displayName}}, \{{user.email}}, \{{user.jobTitle}}, \{{user.department}}, \{{user.pictureUrl}}</div>
+  </div>
+
+  {{!-- ==================== BUTTONS ==================== --}}
+  <div class="component-section">
+    <h2>🔘 Buttons</h2>
+    <div class="component-row">
+      <fluent-button appearance="accent">Accent Button</fluent-button>
+      <fluent-button appearance="neutral">Neutral Button</fluent-button>
+      <fluent-button appearance="outline">Outline Button</fluent-button>
+      <fluent-button appearance="subtle">Subtle Button</fluent-button>
+      <fluent-button appearance="transparent">Transparent Button</fluent-button>
+      <fluent-button appearance="accent" disabled>Disabled</fluent-button>
+    </div>
+    <div class="component-row">
+      <fluent-button appearance="accent" size="small">Small</fluent-button>
+      <fluent-button appearance="accent" size="medium">Medium</fluent-button>
+      <fluent-button appearance="accent" size="large">Large</fluent-button>
+    </div>
+    <div class="component-row">
+      <fluent-button appearance="accent" icon-only aria-label="Settings">
+        <svg slot="start" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M10 13a3 3 0 100-6 3 3 0 000 6zm0-1a2 2 0 110-4 2 2 0 010 4z"/>
+        </svg>
+      </fluent-button>
+      <fluent-button href="https://microsoft.com" appearance="outline">Link Button</fluent-button>
+    </div>
+    <div class="code-hint">&lt;fluent-button appearance="accent"&gt;Click Me&lt;/fluent-button&gt;</div>
+  </div>
+
+  {{!-- ==================== BADGES ==================== --}}
+  <div class="component-section">
+    <h2>🏷️ Badges</h2>
+    <div class="component-row">
+      <fluent-badge appearance="filled">Filled</fluent-badge>
+      <fluent-badge appearance="ghost">Ghost</fluent-badge>
+      <fluent-badge appearance="outline">Outline</fluent-badge>
+      <fluent-badge appearance="tint">Tint</fluent-badge>
+    </div>
+    <div class="component-row">
+      <fluent-badge color="brand">Brand</fluent-badge>
+      <fluent-badge color="danger">Danger</fluent-badge>
+      <fluent-badge color="important">Important</fluent-badge>
+      <fluent-badge color="informative">Informative</fluent-badge>
+      <fluent-badge color="severe">Severe</fluent-badge>
+      <fluent-badge color="subtle">Subtle</fluent-badge>
+      <fluent-badge color="success">Success</fluent-badge>
+      <fluent-badge color="warning">Warning</fluent-badge>
+    </div>
+    <div class="component-row">
+      <fluent-badge size="tiny">Tiny</fluent-badge>
+      <fluent-badge size="extra-small">Extra Small</fluent-badge>
+      <fluent-badge size="small">Small</fluent-badge>
+      <fluent-badge size="medium">Medium</fluent-badge>
+      <fluent-badge size="large">Large</fluent-badge>
+      <fluent-badge size="extra-large">Extra Large</fluent-badge>
+    </div>
+    <div class="code-hint">&lt;fluent-badge color="success"&gt;Approved&lt;/fluent-badge&gt;</div>
+  </div>
+
+  {{!-- ==================== ACCORDION ==================== --}}
+  <div class="component-section">
+    <h2>📂 Accordion</h2>
+    <fluent-accordion>
+      <fluent-accordion-item expanded>
+        <span slot="heading">
+          <strong>Getting Started</strong>
+        </span>
+        <div style="padding: 12px;">
+          This accordion panel is expanded by default. Use the <code>expanded</code> attribute.
+        </div>
+      </fluent-accordion-item>
+      <fluent-accordion-item>
+        <span slot="heading">
+          <strong>Your List Items ({{items.length}} items)</strong>
+        </span>
+        <div style="padding: 12px;">
+          {{#if items.length}}
+            <ul>
+              {{#each items}}
+                <li>{{Title}}</li>
+              {{/each}}
+            </ul>
+          {{else}}
+            <em>No items found in the primary list.</em>
+          {{/if}}
+        </div>
+      </fluent-accordion-item>
+      <fluent-accordion-item>
+        <span slot="heading">
+          <strong>Additional Information</strong>
+        </span>
+        <div style="padding: 12px;">
+          You can nest any content inside accordion panels including other Fluent components.
+          <div style="margin-top: 12px;">
+            <fluent-button appearance="outline" size="small">Action Button</fluent-button>
+          </div>
+        </div>
+      </fluent-accordion-item>
+    </fluent-accordion>
+    <div class="code-hint">&lt;fluent-accordion&gt;&lt;fluent-accordion-item&gt;&lt;span slot="heading"&gt;Title&lt;/span&gt;Content&lt;/fluent-accordion-item&gt;&lt;/fluent-accordion&gt;</div>
+  </div>
+
+  {{!-- ==================== TABS ==================== --}}
+  <div class="component-section">
+    <h2>📑 Tabs</h2>
+    <fluent-tabs>
+      <fluent-tab id="tab-items-{{wpId}}">List Items</fluent-tab>
+      <fluent-tab id="tab-user-{{wpId}}">User Info</fluent-tab>
+      <fluent-tab id="tab-help-{{wpId}}">Help</fluent-tab>
+      
+      <fluent-tab-panel id="panel-items-{{wpId}}">
+        <div style="padding: 16px;">
+          <h3>Items from Primary List</h3>
+          {{#if items.length}}
+            {{#each items}}
+              <fluent-card style="padding: 12px; margin: 8px 0;">
+                <strong>{{Title}}</strong>
+                {{#if Description}}<p>{{Description}}</p>{{/if}}
+              </fluent-card>
+            {{/each}}
+          {{else}}
+            <fluent-badge color="informative">No items configured</fluent-badge>
+          {{/if}}
+        </div>
+      </fluent-tab-panel>
+      
+      <fluent-tab-panel id="panel-user-{{wpId}}">
+        <div style="padding: 16px;">
+          <h3>Current User Details</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Name:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">{{user.displayName}}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Email:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">{{user.email}}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Job Title:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">{{user.jobTitle}}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Department:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">{{user.department}}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Office:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">{{user.office}}</td></tr>
+            <tr><td style="padding: 8px;"><strong>Phone:</strong></td><td style="padding: 8px;">{{user.phone}}</td></tr>
+          </table>
+        </div>
+      </fluent-tab-panel>
+      
+      <fluent-tab-panel id="panel-help-{{wpId}}">
+        <div style="padding: 16px;">
+          <h3>Template Help</h3>
+          <p>Use Handlebars syntax to access your data:</p>
+          <ul>
+            <li><code>\{{#each items}}</code> - Loop through list items</li>
+            <li><code>\{{user.displayName}}</code> - Current user's name</li>
+            <li><code>\{{#each announcements}}</code> - Additional data sources (by key name)</li>
+          </ul>
+        </div>
+      </fluent-tab-panel>
+    </fluent-tabs>
+    <div class="code-hint">&lt;fluent-tabs&gt;&lt;fluent-tab id="t1"&gt;Tab 1&lt;/fluent-tab&gt;&lt;fluent-tab-panel id="p1"&gt;Content&lt;/fluent-tab-panel&gt;&lt;/fluent-tabs&gt;</div>
+  </div>
+
+  {{!-- ==================== CARDS ==================== --}}
+  <div class="component-section">
+    <h2>🃏 Cards</h2>
+    <div class="component-row">
+      <fluent-card style="padding: 20px; width: 250px;">
+        <h3 style="margin-top: 0;">Basic Card</h3>
+        <p>Cards provide a flexible container for content.</p>
+        <fluent-button appearance="accent">Action</fluent-button>
+      </fluent-card>
+      
+      <fluent-card style="padding: 0; width: 250px; overflow: hidden;">
+        <div style="background: linear-gradient(135deg, #0078d4, #00bcf2); padding: 40px; color: white; text-align: center;">
+          <strong style="font-size: 24px;">Featured</strong>
+        </div>
+        <div style="padding: 16px;">
+          <p>Card with header image area</p>
+          <fluent-button appearance="outline" style="width: 100%;">Learn More</fluent-button>
+        </div>
+      </fluent-card>
+      
+      <fluent-card style="padding: 20px; width: 250px;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+          <fluent-avatar name="{{user.displayName}}"></fluent-avatar>
+          <div>
+            <strong>{{user.displayName}}</strong>
+            <div style="font-size: 12px; color: #666;">{{user.jobTitle}}</div>
+          </div>
+        </div>
+        <p style="margin: 0;">Card with user avatar and profile information.</p>
+      </fluent-card>
+    </div>
+    <div class="code-hint">&lt;fluent-card style="padding: 20px;"&gt;Card Content&lt;/fluent-card&gt;</div>
+  </div>
+
+  {{!-- ==================== FORM INPUTS ==================== --}}
+  <div class="component-section">
+    <h2>📝 Form Inputs</h2>
+    <div class="component-demo">
+      <div style="display: grid; gap: 16px; max-width: 400px;">
+        <fluent-text-field placeholder="Enter text here">
+          <span slot="start">📧</span>
+          Text Field
+        </fluent-text-field>
+        
+        <fluent-text-area placeholder="Enter multiple lines..." resize="vertical">
+          Text Area
+        </fluent-text-area>
+        
+        <fluent-number-field value="42">
+          Number Field
+        </fluent-number-field>
+        
+        <fluent-search placeholder="Search...">
+          Search Field
+        </fluent-search>
+        
+        <fluent-select>
+          <fluent-option value="">Select an option</fluent-option>
+          <fluent-option value="1">Option 1</fluent-option>
+          <fluent-option value="2">Option 2</fluent-option>
+          <fluent-option value="3">Option 3</fluent-option>
+        </fluent-select>
+        
+        <fluent-combobox placeholder="Type or select...">
+          <fluent-option value="apple">Apple</fluent-option>
+          <fluent-option value="banana">Banana</fluent-option>
+          <fluent-option value="cherry">Cherry</fluent-option>
+        </fluent-combobox>
+        
+        <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+          <fluent-checkbox>Checkbox Option</fluent-checkbox>
+          <fluent-checkbox checked>Checked</fluent-checkbox>
+          <fluent-checkbox indeterminate>Indeterminate</fluent-checkbox>
+        </div>
+        
+        <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+          <fluent-switch>Toggle Switch</fluent-switch>
+          <fluent-switch checked>Enabled</fluent-switch>
+        </div>
+        
+        <fluent-radio-group orientation="horizontal">
+          <fluent-radio value="a">Option A</fluent-radio>
+          <fluent-radio value="b">Option B</fluent-radio>
+          <fluent-radio value="c">Option C</fluent-radio>
+        </fluent-radio-group>
+        
+        <fluent-slider min="0" max="100" value="50">
+          Slider
+        </fluent-slider>
+      </div>
+    </div>
+    <div class="code-hint">&lt;fluent-text-field&gt;Label&lt;/fluent-text-field&gt;, &lt;fluent-select&gt;, &lt;fluent-checkbox&gt;, &lt;fluent-switch&gt;</div>
+  </div>
+
+  {{!-- ==================== PROGRESS INDICATORS ==================== --}}
+  <div class="component-section">
+    <h2>⏳ Progress Indicators</h2>
+    <div class="component-row" style="align-items: center;">
+      <div>
+        <p><strong>Progress Bar:</strong></p>
+        <fluent-progress style="width: 200px;"></fluent-progress>
+        <p style="margin-top: 16px;"><strong>Progress Bar (with value):</strong></p>
+        <fluent-progress value="75" max="100" style="width: 200px;"></fluent-progress>
+      </div>
+      <div style="text-align: center;">
+        <p><strong>Progress Ring:</strong></p>
+        <fluent-progress-ring></fluent-progress-ring>
+      </div>
+      <div style="text-align: center;">
+        <p><strong>Spinner:</strong></p>
+        <fluent-spinner size="medium"></fluent-spinner>
+      </div>
+    </div>
+    <div class="code-hint">&lt;fluent-progress value="75"&gt;&lt;/fluent-progress&gt;, &lt;fluent-progress-ring&gt;&lt;/fluent-progress-ring&gt;, &lt;fluent-spinner&gt;&lt;/fluent-spinner&gt;</div>
+  </div>
+
+  {{!-- ==================== AVATARS ==================== --}}
+  <div class="component-section">
+    <h2>👥 Avatars</h2>
+    <div class="component-row" style="align-items: center;">
+      <fluent-avatar name="John Doe" size="20"></fluent-avatar>
+      <fluent-avatar name="Jane Smith" size="24"></fluent-avatar>
+      <fluent-avatar name="Bob Wilson" size="28"></fluent-avatar>
+      <fluent-avatar name="Alice Brown" size="32"></fluent-avatar>
+      <fluent-avatar name="Charlie Davis" size="36"></fluent-avatar>
+      <fluent-avatar name="{{user.displayName}}" size="48"></fluent-avatar>
+      <fluent-avatar name="{{user.displayName}}" size="56"></fluent-avatar>
+      <fluent-avatar name="{{user.displayName}}" size="64"></fluent-avatar>
+    </div>
+    <div class="component-row" style="align-items: center;">
+      <fluent-avatar name="Active User" size="32" active="active">
+        <fluent-badge slot="badge" size="tiny" color="success"></fluent-badge>
+      </fluent-avatar>
+      <fluent-avatar name="Away User" size="32">
+        <fluent-badge slot="badge" size="tiny" color="warning"></fluent-badge>
+      </fluent-avatar>
+      <fluent-avatar name="Busy User" size="32">
+        <fluent-badge slot="badge" size="tiny" color="danger"></fluent-badge>
+      </fluent-avatar>
+    </div>
+    <div class="code-hint">&lt;fluent-avatar name="John Doe" size="32"&gt;&lt;/fluent-avatar&gt;</div>
+  </div>
+
+  {{!-- ==================== DIALOGS - WORKING EXAMPLE ==================== --}}
+  <div class="component-section">
+    <h2>💬 Dialog (Modal) - Click to Open!</h2>
+    <div class="component-row">
+      <fluent-button appearance="accent" onclick="document.getElementById('sample-dialog-' + this.closest('[data-wpid]').dataset.wpid).show()">
+        Open Dialog
+      </fluent-button>
+      <fluent-button appearance="outline" onclick="document.getElementById('confirm-dialog-' + this.closest('[data-wpid]').dataset.wpid).show()">
+        Open Confirm Dialog
+      </fluent-button>
+      <fluent-button appearance="neutral" onclick="document.getElementById('form-dialog-' + this.closest('[data-wpid]').dataset.wpid).show()">
+        Open Form Dialog
+      </fluent-button>
+    </div>
+    
+    {{!-- Basic Dialog --}}
+    <fluent-dialog id="sample-dialog-{{wpId}}" modal-type="modal" hidden>
+      <div slot="title">Sample Dialog</div>
+      <fluent-button slot="title-action" appearance="subtle" onclick="this.closest('fluent-dialog').hide()" title="Close">
+        ✕
+      </fluent-button>
+      <div style="padding: 20px;">
+        <p>This is a basic modal dialog. Click outside or press the X to close.</p>
+        <p>You can put any content here including Fluent components.</p>
+        <fluent-badge color="success">It works!</fluent-badge>
+      </div>
+      <fluent-button slot="action" appearance="accent" onclick="this.closest('fluent-dialog').hide()">
+        Close
+      </fluent-button>
+    </fluent-dialog>
+    
+    {{!-- Confirm Dialog --}}
+    <fluent-dialog id="confirm-dialog-{{wpId}}" modal-type="alert" hidden>
+      <div slot="title">⚠️ Confirm Action</div>
+      <fluent-button slot="title-action" appearance="subtle" onclick="this.closest('fluent-dialog').hide()" title="Close">
+        ✕
+      </fluent-button>
+      <div style="padding: 20px;">
+        <p>Are you sure you want to proceed with this action?</p>
+        <p style="color: #d13438;">This action cannot be undone.</p>
+      </div>
+      <fluent-button slot="action" appearance="neutral" onclick="this.closest('fluent-dialog').hide()">
+        Cancel
+      </fluent-button>
+      <fluent-button slot="action" appearance="accent" onclick="alert('Confirmed!'); this.closest('fluent-dialog').hide()">
+        Confirm
+      </fluent-button>
+    </fluent-dialog>
+    
+    {{!-- Form Dialog --}}
+    <fluent-dialog id="form-dialog-{{wpId}}" modal-type="modal" hidden>
+      <div slot="title">📝 Form Dialog</div>
+      <fluent-button slot="title-action" appearance="subtle" onclick="this.closest('fluent-dialog').hide()" title="Close">
+        ✕
+      </fluent-button>
+      <div style="padding: 20px; min-width: 300px;">
+        <fluent-text-field style="width: 100%; margin-bottom: 12px;" placeholder="Enter name">
+          Name
+        </fluent-text-field>
+        <fluent-text-field style="width: 100%; margin-bottom: 12px;" placeholder="Enter email" type="email">
+          Email
+        </fluent-text-field>
+        <fluent-text-area style="width: 100%;" placeholder="Enter message" rows="3">
+          Message
+        </fluent-text-area>
+      </div>
+      <fluent-button slot="action" appearance="neutral" onclick="this.closest('fluent-dialog').hide()">
+        Cancel
+      </fluent-button>
+      <fluent-button slot="action" appearance="accent" onclick="alert('Form submitted!'); this.closest('fluent-dialog').hide()">
+        Submit
+      </fluent-button>
+    </fluent-dialog>
+    
+    <div class="code-hint">
+      Button: onclick="this.closest('[data-wpid]').querySelector('#my-dialog-{{wpId}}').show()"<br>
+      Close: onclick="this.closest('fluent-dialog').hide()"
+    </div>
+  </div>
+
+  {{!-- ==================== DRAWER - WORKING EXAMPLE ==================== --}}
+  <div class="component-section">
+    <h2>📥 Drawer (Side Panel) - Click to Open!</h2>
+    <div class="component-row">
+      <fluent-button appearance="accent" onclick="document.getElementById('drawer-start-' + this.closest('[data-wpid]').dataset.wpid).show()">
+        Open Left Drawer
+      </fluent-button>
+      <fluent-button appearance="outline" onclick="document.getElementById('drawer-end-' + this.closest('[data-wpid]').dataset.wpid).show()">
+        Open Right Drawer
+      </fluent-button>
+    </div>
+    
+    {{!-- Left Drawer --}}
+    <fluent-drawer id="drawer-start-{{wpId}}" position="start" modal-type="modal" style="--drawer-width: 320px;" hidden>
+      <div slot="title">📋 Navigation Drawer</div>
+      <fluent-button slot="title-action" appearance="subtle" onclick="this.closest('fluent-drawer').hide()" title="Close">
+        ✕
+      </fluent-button>
+      <div style="padding: 20px;">
+        <h4 style="margin-top: 0;">Menu Items</h4>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <fluent-button appearance="subtle" style="justify-content: flex-start;">🏠 Home</fluent-button>
+          <fluent-button appearance="subtle" style="justify-content: flex-start;">📊 Dashboard</fluent-button>
+          <fluent-button appearance="subtle" style="justify-content: flex-start;">📁 Documents</fluent-button>
+          <fluent-button appearance="subtle" style="justify-content: flex-start;">⚙️ Settings</fluent-button>
+        </div>
+        <fluent-divider style="margin: 16px 0;"></fluent-divider>
+        <h4>User Info</h4>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <fluent-avatar name="{{user.displayName}}" size="32"></fluent-avatar>
+          <div>
+            <div style="font-weight: 600;">{{user.displayName}}</div>
+            <div style="font-size: 12px; color: #666;">{{user.email}}</div>
+          </div>
+        </div>
+      </div>
+      <fluent-button slot="action" appearance="accent" onclick="this.closest('fluent-drawer').hide()">
+        Close Drawer
+      </fluent-button>
+    </fluent-drawer>
+    
+    {{!-- Right Drawer --}}
+    <fluent-drawer id="drawer-end-{{wpId}}" position="end" modal-type="modal" style="--drawer-width: 400px;" hidden>
+      <div slot="title">📄 Item Details</div>
+      <fluent-button slot="title-action" appearance="subtle" onclick="this.closest('fluent-drawer').hide()" title="Close">
+        ✕
+      </fluent-button>
+      <div style="padding: 20px;">
+        <h4 style="margin-top: 0;">Selected Item Information</h4>
+        <fluent-card style="padding: 16px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span><strong>Status:</strong></span>
+            <fluent-badge color="success">Active</fluent-badge>
+          </div>
+        </fluent-card>
+        <fluent-card style="padding: 16px;">
+          <p style="margin: 0;"><strong>Description:</strong></p>
+          <p>This drawer can display detailed information about a selected item from your list.</p>
+          {{#if items.length}}
+            <fluent-divider style="margin: 12px 0;"></fluent-divider>
+            <p><strong>First item title:</strong> {{items.[0].Title}}</p>
+          {{/if}}
+        </fluent-card>
+      </div>
+      <fluent-button slot="action" appearance="neutral" onclick="this.closest('fluent-drawer').hide()">
+        Cancel
+      </fluent-button>
+      <fluent-button slot="action" appearance="accent" onclick="alert('Saved!'); this.closest('fluent-drawer').hide()">
+        Save Changes
+      </fluent-button>
+    </fluent-drawer>
+    
+    <div class="code-hint">
+      Button: onclick="this.closest('[data-wpid]').querySelector('#my-drawer-{{wpId}}').show()"<br>
+      Close: onclick="this.closest('fluent-drawer').hide()"<br>
+      Position: position="start" (left) or position="end" (right)
+    </div>
+  </div>
+
+  {{!-- ==================== MENU & MENU BUTTON ==================== --}}
+  <div class="component-section">
+    <h2>📋 Menu & Menu Button</h2>
+    <div class="component-row">
+      <fluent-menu-button appearance="accent">
+        Actions Menu
+        <fluent-menu>
+          <fluent-menu-item onclick="alert('Edit clicked')">✏️ Edit</fluent-menu-item>
+          <fluent-menu-item onclick="alert('Copy clicked')">📋 Copy</fluent-menu-item>
+          <fluent-menu-item onclick="alert('Share clicked')">🔗 Share</fluent-menu-item>
+          <fluent-divider></fluent-divider>
+          <fluent-menu-item onclick="alert('Delete clicked')">🗑️ Delete</fluent-menu-item>
+        </fluent-menu>
+      </fluent-menu-button>
+      
+      <fluent-menu-button appearance="outline">
+        More Options
+        <fluent-menu>
+          <fluent-menu-item>
+            Sort By
+            <fluent-menu slot="submenu">
+              <fluent-menu-item>Name</fluent-menu-item>
+              <fluent-menu-item>Date</fluent-menu-item>
+              <fluent-menu-item>Size</fluent-menu-item>
+            </fluent-menu>
+          </fluent-menu-item>
+          <fluent-menu-item>Filter</fluent-menu-item>
+          <fluent-menu-item>Export</fluent-menu-item>
+        </fluent-menu>
+      </fluent-menu-button>
+    </div>
+    <div class="code-hint">&lt;fluent-menu-button&gt;Menu&lt;fluent-menu&gt;&lt;fluent-menu-item&gt;Item&lt;/fluent-menu-item&gt;&lt;/fluent-menu&gt;&lt;/fluent-menu-button&gt;</div>
+  </div>
+
+  {{!-- ==================== TOOLTIPS ==================== --}}
+  <div class="component-section">
+    <h2>💭 Tooltips</h2>
+    <div class="component-row">
+      <fluent-button id="tooltip-btn-1-{{wpId}}" appearance="accent">Hover for Tooltip</fluent-button>
+      <fluent-tooltip anchor="tooltip-btn-1-{{wpId}}">This is helpful information!</fluent-tooltip>
+      
+      <fluent-button id="tooltip-btn-2-{{wpId}}" appearance="outline">Another Tooltip</fluent-button>
+      <fluent-tooltip anchor="tooltip-btn-2-{{wpId}}" positioning="above">Tooltip above the button</fluent-tooltip>
+    </div>
+    <div class="code-hint">&lt;fluent-button id="btn1-{{wpId}}"&gt;Hover&lt;/fluent-button&gt;&lt;fluent-tooltip anchor="btn1-{{wpId}}"&gt;Tip text&lt;/fluent-tooltip&gt;</div>
+  </div>
+
+  {{!-- ==================== DIVIDERS ==================== --}}
+  <div class="component-section">
+    <h2>➖ Dividers</h2>
+    <div class="component-demo">
+      <p>Content above divider</p>
+      <fluent-divider></fluent-divider>
+      <p>Content below divider</p>
+      <fluent-divider>Or</fluent-divider>
+      <p>Divider with text</p>
+      <fluent-divider appearance="strong"></fluent-divider>
+      <p>Strong divider</p>
+    </div>
+    <div class="code-hint">&lt;fluent-divider&gt;&lt;/fluent-divider&gt; or &lt;fluent-divider&gt;Text&lt;/fluent-divider&gt;</div>
+  </div>
+
+  {{!-- ==================== MESSAGE BAR ==================== --}}
+  <div class="component-section">
+    <h2>📢 Message Bar</h2>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <fluent-message-bar intent="info">
+        <span slot="title">Information</span>
+        This is an informational message bar.
+      </fluent-message-bar>
+      <fluent-message-bar intent="success">
+        <span slot="title">Success!</span>
+        Your changes have been saved successfully.
+      </fluent-message-bar>
+      <fluent-message-bar intent="warning">
+        <span slot="title">Warning</span>
+        Please review before continuing.
+      </fluent-message-bar>
+      <fluent-message-bar intent="error">
+        <span slot="title">Error</span>
+        Something went wrong. Please try again.
+      </fluent-message-bar>
+    </div>
+    <div class="code-hint">&lt;fluent-message-bar intent="success"&gt;Message&lt;/fluent-message-bar&gt;</div>
+  </div>
+
+  {{!-- ==================== DATA GRID ==================== --}}
+  <div class="component-section">
+    <h2>📊 Data Grid (Your List Items)</h2>
+    {{#if items.length}}
+    <fluent-data-grid aria-label="List Items" style="min-width: 100%;">
+      <fluent-data-grid-row row-type="header">
+        <fluent-data-grid-cell cell-type="columnheader" grid-column="1">Title</fluent-data-grid-cell>
+        <fluent-data-grid-cell cell-type="columnheader" grid-column="2">ID</fluent-data-grid-cell>
+        <fluent-data-grid-cell cell-type="columnheader" grid-column="3">Actions</fluent-data-grid-cell>
+      </fluent-data-grid-row>
+      {{#each items}}
+      <fluent-data-grid-row>
+        <fluent-data-grid-cell grid-column="1">{{Title}}</fluent-data-grid-cell>
+        <fluent-data-grid-cell grid-column="2">
+          <fluent-badge size="small" color="informative">{{Id}}</fluent-badge>
+        </fluent-data-grid-cell>
+        <fluent-data-grid-cell grid-column="3">
+          <fluent-button size="small" appearance="subtle">View</fluent-button>
+        </fluent-data-grid-cell>
+      </fluent-data-grid-row>
+      {{/each}}
+    </fluent-data-grid>
+    {{else}}
+    <fluent-message-bar intent="info">
+      <span slot="title">No Data</span>
+      Configure a list and view in the web part settings to see your data here.
+    </fluent-message-bar>
+    {{/if}}
+    <div class="code-hint">&lt;fluent-data-grid&gt;&lt;fluent-data-grid-row row-type="header"&gt;...&lt;/fluent-data-grid-row&gt;&lt;/fluent-data-grid&gt;</div>
+  </div>
+
+  {{!-- ==================== TREE VIEW ==================== --}}
+  <div class="component-section">
+    <h2>🌳 Tree View</h2>
+    <fluent-tree-view>
+      <fluent-tree-item expanded>
+        <span>📁 Documents</span>
+        <fluent-tree-item slot="item">
+          <span>📄 Report.docx</span>
+        </fluent-tree-item>
+        <fluent-tree-item slot="item">
+          <span>📄 Presentation.pptx</span>
+        </fluent-tree-item>
+        <fluent-tree-item slot="item" expanded>
+          <span>📁 Archive</span>
+          <fluent-tree-item slot="item">
+            <span>📄 Old Report.docx</span>
+          </fluent-tree-item>
+        </fluent-tree-item>
+      </fluent-tree-item>
+      <fluent-tree-item>
+        <span>📁 Images</span>
+        <fluent-tree-item slot="item">
+          <span>🖼️ Photo.jpg</span>
+        </fluent-tree-item>
+      </fluent-tree-item>
+    </fluent-tree-view>
+    <div class="code-hint">&lt;fluent-tree-view&gt;&lt;fluent-tree-item&gt;Parent&lt;fluent-tree-item slot="item"&gt;Child&lt;/fluent-tree-item&gt;&lt;/fluent-tree-item&gt;&lt;/fluent-tree-view&gt;</div>
+  </div>
+
+  {{!-- ==================== BREADCRUMB ==================== --}}
+  <div class="component-section">
+    <h2>🍞 Breadcrumb</h2>
+    <fluent-breadcrumb>
+      <fluent-breadcrumb-item href="#">Home</fluent-breadcrumb-item>
+      <fluent-breadcrumb-item href="#">Documents</fluent-breadcrumb-item>
+      <fluent-breadcrumb-item href="#">Projects</fluent-breadcrumb-item>
+      <fluent-breadcrumb-item>Current Page</fluent-breadcrumb-item>
+    </fluent-breadcrumb>
+    <div class="code-hint">&lt;fluent-breadcrumb&gt;&lt;fluent-breadcrumb-item href="#"&gt;Link&lt;/fluent-breadcrumb-item&gt;&lt;/fluent-breadcrumb&gt;</div>
+  </div>
+
+  {{!-- ==================== LINK ==================== --}}
+  <div class="component-section">
+    <h2>🔗 Links</h2>
+    <div class="component-row">
+      <fluent-link href="https://microsoft.com">Default Link</fluent-link>
+      <fluent-link href="https://microsoft.com" appearance="subtle">Subtle Link</fluent-link>
+      <fluent-link href="https://microsoft.com" inline>Inline Link</fluent-link>
+    </div>
+    <div class="code-hint">&lt;fluent-link href="url"&gt;Link Text&lt;/fluent-link&gt;</div>
+  </div>
+
+  {{!-- ==================== LABEL ==================== --}}
+  <div class="component-section">
+    <h2>🏷️ Labels</h2>
+    <div class="component-row">
+      <fluent-label>Default Label</fluent-label>
+      <fluent-label size="small">Small Label</fluent-label>
+      <fluent-label size="large">Large Label</fluent-label>
+      <fluent-label weight="semibold">Semibold Label</fluent-label>
+      <fluent-label required>Required Field</fluent-label>
+    </div>
+    <div class="code-hint">&lt;fluent-label&gt;Label Text&lt;/fluent-label&gt;</div>
+  </div>
+
+  {{!-- ==================== TEXT ==================== --}}
+  <div class="component-section">
+    <h2>📝 Text</h2>
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <fluent-text size="100">Size 100 - Caption text</fluent-text>
+      <fluent-text size="200">Size 200 - Small text</fluent-text>
+      <fluent-text size="300">Size 300 - Regular body text</fluent-text>
+      <fluent-text size="400">Size 400 - Slightly larger text</fluent-text>
+      <fluent-text size="500" weight="semibold">Size 500 - Subtitle</fluent-text>
+      <fluent-text size="600" weight="semibold">Size 600 - Title</fluent-text>
+      <fluent-text size="700" weight="bold">Size 700 - Large Title</fluent-text>
+      <fluent-text size="800" weight="bold">Size 800 - Display</fluent-text>
+    </div>
+    <div class="code-hint">&lt;fluent-text size="500" weight="semibold"&gt;Text&lt;/fluent-text&gt;</div>
+  </div>
+
+  {{!-- ==================== COUNTER BADGE ==================== --}}
+  <div class="component-section">
+    <h2>🔢 Counter Badge</h2>
+    <div class="component-row" style="align-items: center;">
+      <fluent-counter-badge count="5">
+        <fluent-button appearance="subtle" icon-only>📧</fluent-button>
+      </fluent-counter-badge>
+      <fluent-counter-badge count="{{items.length}}" color="brand">
+        <fluent-button appearance="subtle" icon-only>📋</fluent-button>
+      </fluent-counter-badge>
+      <fluent-counter-badge count="99" overflow-count="99" color="danger">
+        <fluent-button appearance="subtle" icon-only>🔔</fluent-button>
+      </fluent-counter-badge>
+      <fluent-counter-badge count="0" show-zero>
+        <fluent-button appearance="subtle" icon-only>💬</fluent-button>
+      </fluent-counter-badge>
+    </div>
+    <div class="code-hint">&lt;fluent-counter-badge count="5"&gt;&lt;fluent-button&gt;...&lt;/fluent-button&gt;&lt;/fluent-counter-badge&gt;</div>
+  </div>
+
+  {{!-- ==================== QUICK REFERENCE ==================== --}}
+  <div class="component-section">
+    <h2>📚 Quick Reference - All Components</h2>
+    <fluent-accordion>
+      <fluent-accordion-item>
+        <span slot="heading"><strong>Template Variables</strong></span>
+        <div style="padding: 12px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr style="background: #f0f0f0;"><th style="padding: 8px; text-align: left;">Variable</th><th style="padding: 8px; text-align: left;">Description</th></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><code>\{{#each items}}</code></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Loop through primary list items</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><code>\{{items.length}}</code></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Number of items</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><code>\{{user.displayName}}</code></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Current user's name</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><code>\{{user.email}}</code></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Current user's email</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><code>\{{user.jobTitle}}</code></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Current user's job title</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><code>\{{user.department}}</code></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Current user's department</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><code>\{{user.pictureUrl}}</code></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Current user's profile picture</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><code>\{{#each keyName}}</code></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Additional data source by key (e.g., announcements)</td></tr>
+            <tr><td style="padding: 8px;"><code>\{{wpId}}</code></td><td style="padding: 8px;">Web part instance ID (for unique element IDs)</td></tr>
+          </table>
+        </div>
+      </fluent-accordion-item>
+      <fluent-accordion-item>
+        <span slot="heading"><strong>Element ID Patterns: Unique vs Global</strong></span>
+        <div style="padding: 12px;">
+          <h4 style="margin-top: 0;">Instance-Specific (Unique per web part)</h4>
+          <p>Use <code>\{{wpId}}</code> when each web part instance needs its own element:</p>
+          <pre style="background: #f4f4f4; padding: 12px; border-radius: 4px; overflow-x: auto; font-size: 12px;">
+&lt;!-- Unique dialog for this web part instance --&gt;
+&lt;fluent-dialog id="my-dialog-\{{wpId}}"&gt;...&lt;/fluent-dialog&gt;
+
+&lt;!-- Open from button (finds wpId from parent) --&gt;
+&lt;fluent-button onclick="document.getElementById('my-dialog-' + 
+  this.closest('[data-wpid]').dataset.wpid).show()"&gt;Open&lt;/fluent-button&gt;
+
+&lt;!-- Close from inside (simpler) --&gt;
+&lt;fluent-button onclick="this.closest('fluent-dialog').hide()"&gt;Close&lt;/fluent-button&gt;</pre>
+          
+          <h4>Global (Shared across all web parts)</h4>
+          <p>Omit <code>\{{wpId}}</code> when you want ANY web part to control this element (e.g., shared status alerts):</p>
+          <pre style="background: #f4f4f4; padding: 12px; border-radius: 4px; overflow-x: auto; font-size: 12px;">
+&lt;!-- Global status alert - any web part can trigger it --&gt;
+&lt;fluent-dialog id="global-status-alert"&gt;
+  &lt;div slot="title"&gt;Status Update&lt;/div&gt;
+  &lt;div id="global-alert-content"&gt;&lt;/div&gt;
+&lt;/fluent-dialog&gt;
+
+&lt;!-- Any web part can open it --&gt;
+&lt;fluent-button onclick="
+  document.getElementById('global-alert-content').innerHTML = 'Hello!';
+  document.getElementById('global-status-alert').show();
+"&gt;Show Global Alert&lt;/fluent-button&gt;</pre>
+        </div>
+      </fluent-accordion-item>
+      <fluent-accordion-item>
+        <span slot="heading"><strong>Dialog/Drawer JavaScript</strong></span>
+        <div style="padding: 12px;">
+          <pre style="background: #f4f4f4; padding: 12px; border-radius: 4px; overflow-x: auto;">
+// Open dialog or drawer
+document.getElementById('my-dialog').show()
+
+// Close dialog or drawer  
+document.getElementById('my-dialog').hide()
+
+// Toggle
+document.getElementById('my-dialog').toggle()
+          </pre>
+        </div>
+      </fluent-accordion-item>
+    </fluent-accordion>
+  </div>
+
+  {{!-- ==================== GLOBAL SHARED ELEMENTS ==================== --}}
+  {{!-- These elements have NO wpId so ANY web part on the page can use them --}}
+  <fluent-dialog id="global-status-alert" modal-type="alert">
+    <div slot="title">📢 Status Alert</div>
+    <div style="padding: 20px;">
+      <div id="global-alert-content">This is a global alert that any web part on the page can trigger!</div>
+    </div>
+    <fluent-button slot="action" appearance="accent" onclick="this.closest('fluent-dialog').hide()">
+      OK
+    </fluent-button>
+  </fluent-dialog>
+
+</div>
+
+{{!-- 
+  IMPORTANT: The global-status-alert dialog above is OUTSIDE the data-wpid container
+  so it doesn't conflict with instance-specific dialogs. Any element on the page
+  can call: document.getElementById('global-status-alert').show()
+--}}
+
+<script>
+// Force remove M365 Copilot floating agent button to prevent performance issues
+// Only runs in display mode, not in edit mode
+(function() {
+  // Skip if in edit mode
+  if (window.location.search.includes('Mode=Edit') || 
+      window.location.search.includes('mode=edit') ||
+      document.body.classList.contains('ms-SPPage--editing')) {
+    return;
+  }
+  
+  function removeCopilotButton() {
+    const selectors = [
+      '[class*="floating-agent"]',
+      '[class*="FloatingAgent"]',
+      '[class*="copilot-fab"]',
+      '[id*="floating-agent"]',
+      '[id*="FloatingAgent"]'
+    ];
+    selectors.forEach(sel => {
+      document.querySelectorAll(sel).forEach(el => el.remove());
+    });
+  }
+  // Run immediately and observe for dynamically added elements
+  removeCopilotButton();
+  const observer = new MutationObserver(removeCopilotButton);
+  observer.observe(document.body, { childList: true, subtree: true });
+  // Stop observing after 10 seconds to avoid performance impact
+  setTimeout(() => observer.disconnect(), 10000);
+})();
+</script>

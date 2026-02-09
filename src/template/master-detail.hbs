@@ -1,0 +1,276 @@
+{{!-- 
+  Master-Detail Template (Two Lists)
+  ===================================
+  Demonstrates using two data sources where:
+  - First list (items): Master records displayed as cards
+  - Second list (details): Detail records filtered by matching Title == Category
+  
+  Configuration:
+  - Data Source 1: Key = "items" (or use default primary list)
+  - Data Source 2: Key = "details" (secondary list with Category field)
+  
+  Available Data:
+  - items: Primary list data (master records)
+  - details: Secondary list data (to be filtered per master item)
+  - user: Current user profile information
+  - wpId: Web part instance ID
+--}}
+
+<style>
+  .master-detail-container-{{wpId}} {
+    font-family: var(--body-font, 'Segoe UI', sans-serif);
+    padding: 16px;
+  }
+
+  .master-detail-header-{{wpId}} {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .master-detail-title-{{wpId}} {
+    font-size: 24px;
+    font-weight: 600;
+    color: #323130;
+    margin: 0;
+  }
+
+  .master-cards-{{wpId}} {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 24px;
+  }
+
+  .master-card-{{wpId}} {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .master-card-header-{{wpId}} {
+    background: linear-gradient(135deg, #0078d4, #106ebe);
+    padding: 16px;
+    color: white;
+  }
+
+  .master-card-title-{{wpId}} {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .master-card-body-{{wpId}} {
+    padding: 16px;
+  }
+
+  .detail-list-{{wpId}} {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .detail-item-{{wpId}} {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid #edebe9;
+    gap: 12px;
+  }
+
+  .detail-item-{{wpId}}:last-child {
+    border-bottom: none;
+  }
+
+  .detail-item-{{wpId}}:hover {
+    background: #f3f2f1;
+  }
+
+  .detail-icon-{{wpId}} {
+    width: 32px;
+    height: 32px;
+    background: #e1dfdd;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+
+  .detail-info-{{wpId}} {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .detail-title-{{wpId}} {
+    font-weight: 600;
+    color: #323130;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .detail-meta-{{wpId}} {
+    font-size: 12px;
+    color: #605e5c;
+  }
+
+  .empty-details-{{wpId}} {
+    padding: 20px;
+    text-align: center;
+    color: #605e5c;
+    font-style: italic;
+  }
+
+  .detail-count-{{wpId}} {
+    font-size: 12px;
+    opacity: 0.9;
+    margin-top: 4px;
+  }
+
+  .view-all-btn-{{wpId}} {
+    margin-top: 12px;
+    width: 100%;
+  }
+</style>
+
+<div class="master-detail-container-{{wpId}}" data-wpid="{{wpId}}">
+  
+  {{!-- Header --}}
+  <div class="master-detail-header-{{wpId}}">
+    <h2 class="master-detail-title-{{wpId}}">Categories & Items</h2>
+    <div style="display: flex; gap: 8px;">
+      <fluent-badge appearance="filled" color="brand">{{items.length}} categories</fluent-badge>
+      <fluent-badge appearance="outline">{{details.length}} total items</fluent-badge>
+    </div>
+  </div>
+
+  {{#if items.length}}
+    <div class="master-cards-{{wpId}}">
+      {{#each items}}
+        {{!-- Store the master item's Title for filtering --}}
+        {{#with (lookup ../this "Title") as |masterTitle|}}
+        {{/with}}
+        
+        <fluent-card class="master-card-{{../wpId}}">
+          {{!-- Card Header with Category Name --}}
+          <div class="master-card-header-{{../wpId}}">
+            <h3 class="master-card-title-{{../wpId}}">{{Title}}</h3>
+            {{!-- Count matching details --}}
+            <div class="detail-count-{{../wpId}}">
+              {{#each ../details}}
+                {{#eq Category ../Title}}+{{/eq}}
+              {{/each}}
+              items
+            </div>
+          </div>
+          
+          <div class="master-card-body-{{../wpId}}">
+            {{#if Description}}
+              <p style="margin: 0 0 16px 0; color: #605e5c; font-size: 14px;">{{Description}}</p>
+            {{/if}}
+            
+            {{!-- Filtered Detail List --}}
+            <ul class="detail-list-{{../wpId}}">
+              {{#each ../details}}
+                {{!-- Filter: only show details where Category matches master Title --}}
+                {{#eq Category ../Title}}
+                  <li class="detail-item-{{../../wpId}}">
+                    <div class="detail-icon-{{../../wpId}}">📄</div>
+                    <div class="detail-info-{{../../wpId}}">
+                      <div class="detail-title-{{../../wpId}}">{{Title}}</div>
+                      {{#if Modified}}
+                        <div class="detail-meta-{{../../wpId}}">Modified: {{Modified}}</div>
+                      {{/if}}
+                    </div>
+                    {{#if Status}}
+                      <fluent-badge size="small" 
+                        color="{{#eq Status 'Active'}}success{{else}}{{#eq Status 'Complete'}}success{{else}}{{#eq Status 'Pending'}}warning{{else}}informative{{/eq}}{{/eq}}{{/eq}}">
+                        {{Status}}
+                      </fluent-badge>
+                    {{/if}}
+                  </li>
+                {{/eq}}
+              {{/each}}
+            </ul>
+
+            {{!-- Show empty state if no matching details --}}
+            {{#unless (some ../details "Category" Title)}}
+              <div class="empty-details-{{../wpId}}">
+                No items in this category
+              </div>
+            {{/unless}}
+
+            {{!-- View All Button --}}
+            <fluent-button class="view-all-btn-{{../wpId}}" appearance="outline" size="small"
+              onclick="document.getElementById('detail-drawer-{{../wpId}}-{{@index}}').show()">
+              View All Details
+            </fluent-button>
+          </div>
+        </fluent-card>
+
+        {{!-- Detail Drawer for this category --}}
+        <fluent-drawer id="detail-drawer-{{../wpId}}-{{@index}}" position="end" modal-type="modal" style="--drawer-width: 450px;" hidden>
+          <div slot="title">{{Title}} - All Items</div>
+          <fluent-button slot="title-action" appearance="subtle" onclick="this.closest('fluent-drawer').hide()" title="Close">
+            ✕
+          </fluent-button>
+          <div style="padding: 20px;">
+            {{#if Description}}
+              <fluent-card style="padding: 12px; margin-bottom: 16px; background: #f3f2f1;">
+                <p style="margin: 0; font-size: 14px; color: #605e5c;">{{Description}}</p>
+              </fluent-card>
+            {{/if}}
+            
+            <h4 style="margin: 0 0 12px 0; color: #323130;">Items in this category:</h4>
+            
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              {{#each ../details}}
+                {{#eq Category ../Title}}
+                  <fluent-card style="padding: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                      <div>
+                        <div style="font-weight: 600; margin-bottom: 4px;">{{Title}}</div>
+                        {{#if Description}}
+                          <div style="font-size: 13px; color: #605e5c;">{{Description}}</div>
+                        {{/if}}
+                      </div>
+                      {{#if Status}}
+                        <fluent-badge size="small" 
+                          color="{{#eq Status 'Active'}}success{{else}}{{#eq Status 'Complete'}}success{{else}}{{#eq Status 'Pending'}}warning{{else}}informative{{/eq}}{{/eq}}{{/eq}}">
+                          {{Status}}
+                        </fluent-badge>
+                      {{/if}}
+                    </div>
+                    {{#if Author}}
+                      <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #edebe9;">
+                        <fluent-avatar name="{{Author.Title}}" size="20"></fluent-avatar>
+                        <span style="font-size: 12px; color: #605e5c;">{{Author.Title}}</span>
+                      </div>
+                    {{/if}}
+                  </fluent-card>
+                {{/eq}}
+              {{/each}}
+            </div>
+          </div>
+          <fluent-button slot="action" appearance="accent" onclick="this.closest('fluent-drawer').hide()">
+            Close
+          </fluent-button>
+        </fluent-drawer>
+
+      {{/each}}
+    </div>
+  {{else}}
+    <div style="text-align: center; padding: 60px 20px; background: #faf9f8; border-radius: 8px;">
+      <div style="font-size: 48px; margin-bottom: 16px;">📁</div>
+      <fluent-text size="500" weight="semibold">No categories found</fluent-text>
+      <p style="color: #605e5c; margin-top: 8px;">
+        Configure two data sources:<br>
+        1. Primary list with categories (key: "items")<br>
+        2. Secondary list with items having a "Category" field (key: "details")
+      </p>
+    </div>
+  {{/if}}
+
+</div>

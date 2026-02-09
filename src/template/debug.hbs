@@ -1,0 +1,176 @@
+{{!-- 
+  Debug Template - JSON Data Viewer
+  ==================================
+  Displays the raw JSON data available to the template for debugging purposes.
+  
+  Available Data:
+  - items: Primary list data from configured list/view
+  - user: Current user profile information
+  - wpId: Web part instance ID
+  - Any additional data sources configured by key
+--}}
+
+<style>
+  .debug-container-{{wpId}} {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    padding: 16px;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border-radius: 8px;
+    overflow: auto;
+  }
+
+  .debug-header-{{wpId}} {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #444;
+  }
+
+  .debug-title-{{wpId}} {
+    font-size: 18px;
+    font-weight: 600;
+    color: #569cd6;
+    margin: 0;
+  }
+
+  .debug-section-{{wpId}} {
+    margin-bottom: 24px;
+  }
+
+  .debug-section-title-{{wpId}} {
+    font-size: 14px;
+    font-weight: 600;
+    color: #4ec9b0;
+    margin: 0 0 8px 0;
+    padding: 4px 8px;
+    background: #2d2d2d;
+    border-radius: 4px;
+    display: inline-block;
+  }
+
+  .debug-json-{{wpId}} {
+    background: #252526;
+    padding: 12px;
+    border-radius: 4px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 12px;
+    line-height: 1.5;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .debug-json-{{wpId}} .key {
+    color: #9cdcfe;
+  }
+
+  .debug-json-{{wpId}} .string {
+    color: #ce9178;
+  }
+
+  .debug-json-{{wpId}} .number {
+    color: #b5cea8;
+  }
+
+  .debug-json-{{wpId}} .boolean {
+    color: #569cd6;
+  }
+
+  .debug-json-{{wpId}} .null {
+    color: #569cd6;
+  }
+
+  .debug-stats-{{wpId}} {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .debug-stat-{{wpId}} {
+    background: #2d2d2d;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+
+  .debug-stat-label-{{wpId}} {
+    color: #808080;
+    margin-right: 8px;
+  }
+
+  .debug-stat-value-{{wpId}} {
+    color: #dcdcaa;
+    font-weight: 600;
+  }
+
+  .debug-copy-btn-{{wpId}} {
+    background: #0e639c;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+
+  .debug-copy-btn-{{wpId}}:hover {
+    background: #1177bb;
+  }
+</style>
+
+<div class="debug-container-{{wpId}}" data-wpid="{{wpId}}">
+  
+  <div class="debug-header-{{wpId}}">
+    <h2 class="debug-title-{{wpId}}">🔍 Template Data Debug View</h2>
+    <button class="debug-copy-btn-{{wpId}}" onclick="
+      const data = this.closest('[data-wpid]').querySelector('.debug-all-data').textContent;
+      navigator.clipboard.writeText(data).then(() => {
+        this.textContent = '✓ Copied!';
+        setTimeout(() => this.textContent = 'Copy All', 2000);
+      });
+    ">Copy All</button>
+  </div>
+
+  {{!-- Quick Stats --}}
+  <div class="debug-stats-{{wpId}}">
+    <div class="debug-stat-{{wpId}}">
+      <span class="debug-stat-label-{{wpId}}">Items:</span>
+      <span class="debug-stat-value-{{wpId}}">{{items.length}}</span>
+    </div>
+    <div class="debug-stat-{{wpId}}">
+      <span class="debug-stat-label-{{wpId}}">User:</span>
+      <span class="debug-stat-value-{{wpId}}">{{user.displayName}}</span>
+    </div>
+    <div class="debug-stat-{{wpId}}">
+      <span class="debug-stat-label-{{wpId}}">Web Part ID:</span>
+      <span class="debug-stat-value-{{wpId}}">{{wpId}}</span>
+    </div>
+  </div>
+
+  {{!-- User Profile --}}
+  <div class="debug-section-{{wpId}}">
+    <h3 class="debug-section-title-{{wpId}}">👤 User Profile</h3>
+    <pre class="debug-json-{{wpId}}">{{json user}}</pre>
+  </div>
+
+  {{!-- Primary Items --}}
+  <div class="debug-section-{{wpId}}">
+    <h3 class="debug-section-title-{{wpId}}">📋 Items ({{items.length}} total)</h3>
+    <pre class="debug-json-{{wpId}}">{{json items}}</pre>
+  </div>
+
+  {{!-- Full Context (hidden for copy) --}}
+  <pre class="debug-all-data" style="display: none;">{{json this}}</pre>
+
+  {{!-- Full Template Context --}}
+  <div class="debug-section-{{wpId}}">
+    <h3 class="debug-section-title-{{wpId}}">🌐 Full Template Context</h3>
+    <pre class="debug-json-{{wpId}}">{{json this}}</pre>
+  </div>
+
+</div>

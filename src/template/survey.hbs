@@ -1,0 +1,475 @@
+{{!-- 
+  Survey Template
+  
+  This template displays a survey question with answer options and shows results.
+  
+  Required Data Sources:
+  1. Primary data source (items): Survey questions list
+     - Title: The question text
+     - Options: Pipe-delimited answer choices (e.g., "Strongly Agree|Agree|Neutral|Disagree|Strongly Disagree")
+     - Id or ID: Unique identifier for the question
+  
+  2. Additional data source key "responses": Survey responses list
+     - QuestionId: The ID of the question being answered
+     - Answer: The selected answer text
+     - RespondentEmail: Email of the respondent
+  
+  Required Submit Endpoint:
+  - Key: "submitSurvey" - configured to POST to the responses list
+  
+  Features:
+  - Shows existing answer if user has already voted
+  - Tabs to switch between voting and viewing results
+  - Bar chart visualization of response counts
+--}}
+
+<style>
+  .survey-container {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: var(--fontFamilyBase);
+  }
+  
+  .survey-header {
+    margin-bottom: 24px;
+  }
+  
+  .survey-header h1 {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    color: var(--colorNeutralForeground1);
+  }
+  
+  .survey-header p {
+    color: var(--colorNeutralForeground2);
+    margin: 0;
+    font-size: 14px;
+  }
+  
+  .question-card {
+    background: var(--colorNeutralBackground1);
+    border: 1px solid var(--colorNeutralStroke1);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  
+  .question-text {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 20px 0;
+    color: var(--colorNeutralForeground1);
+  }
+  
+  .answer-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .answer-option {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--colorNeutralBackground2);
+    border: 2px solid var(--colorNeutralStroke1);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  
+  .answer-option:hover {
+    border-color: var(--colorBrandStroke1);
+    background: var(--colorNeutralBackground3);
+  }
+  
+  .answer-option.selected {
+    border-color: var(--colorBrandBackground);
+    background: var(--colorBrandBackground2);
+  }
+  
+  .answer-option input[type="radio"] {
+    margin-right: 12px;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--colorBrandBackground);
+  }
+  
+  .answer-option label {
+    flex: 1;
+    cursor: pointer;
+    font-size: 15px;
+  }
+  
+  .already-voted {
+    background: var(--colorStatusSuccessBackground1);
+    border: 1px solid var(--colorStatusSuccessBorder1);
+    color: var(--colorStatusSuccessForeground1);
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .already-voted .icon {
+    font-size: 18px;
+  }
+  
+  .form-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: flex-end;
+  }
+  
+  /* Results Tab Styles */
+  .results-container {
+    padding: 20px 0;
+  }
+  
+  .results-summary {
+    margin-bottom: 24px;
+    padding: 16px;
+    background: var(--colorNeutralBackground2);
+    border-radius: 6px;
+  }
+  
+  .results-summary .total {
+    font-size: 14px;
+    color: var(--colorNeutralForeground2);
+  }
+  
+  .results-summary .total strong {
+    color: var(--colorNeutralForeground1);
+    font-size: 24px;
+  }
+  
+  .bar-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .bar-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .bar-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+  }
+  
+  .bar-label-text {
+    font-weight: 500;
+    color: var(--colorNeutralForeground1);
+  }
+  
+  .bar-label-count {
+    color: var(--colorNeutralForeground2);
+  }
+  
+  .bar-track {
+    height: 28px;
+    background: var(--colorNeutralBackground3);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  
+  .bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--colorBrandBackground), var(--colorBrandBackground2Pressed));
+    border-radius: 4px;
+    transition: width 0.5s ease-out;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 8px;
+    min-width: 40px;
+  }
+  
+  .bar-percentage {
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+  
+  .bar-fill.empty {
+    min-width: 0;
+    background: transparent;
+  }
+  
+  .bar-fill.empty .bar-percentage {
+    color: var(--colorNeutralForeground3);
+    text-shadow: none;
+    padding-left: 8px;
+  }
+  
+  /* My Vote indicator in results */
+  .bar-item.my-vote .bar-label-text::after {
+    content: " ✓ Your vote";
+    font-size: 11px;
+    color: var(--colorStatusSuccessForeground1);
+    font-weight: normal;
+    margin-left: 8px;
+  }
+  
+  /* Tabs styling */
+  fluent-tabs {
+    width: 100%;
+  }
+  
+  fluent-tab {
+    padding: 12px 20px;
+  }
+  
+  fluent-tab-panel {
+    padding: 0;
+  }
+  
+  /* Message styling */
+  .form-message {
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+    display: none;
+  }
+  
+  .form-message.success {
+    background-color: var(--colorStatusSuccessBackground1);
+    color: var(--colorStatusSuccessForeground1);
+    border: 1px solid var(--colorStatusSuccessBorder1);
+    display: block;
+  }
+  
+  .form-message.error {
+    background-color: var(--colorStatusDangerBackground1);
+    color: var(--colorStatusDangerForeground1);
+    border: 1px solid var(--colorStatusDangerBorder1);
+    display: block;
+  }
+  
+  /* No questions message */
+  .no-questions {
+    text-align: center;
+    padding: 40px;
+    color: var(--colorNeutralForeground3);
+  }
+  
+  .no-questions .icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+  }
+</style>
+
+<div class="survey-container">
+  <div class="survey-header">
+    <h1>📊 Survey</h1>
+    <p>Share your opinion and see what others think</p>
+  </div>
+  
+  {{#if items}}
+    {{#each items}}
+      {{!-- Parse options into an array --}}
+      {{#with (split this.Options "|") as |optionsArray|}}
+        
+        {{!-- Find if current user has already voted on this question --}}
+        {{#with (lookup @root "responses") as |allResponses|}}
+          {{#with (filter allResponses "QuestionId" ../ID) as |questionResponses|}}
+            {{#with (filter questionResponses "RespondentEmail" @root.userProfile.Email) as |myResponses|}}
+              {{#with (first myResponses) as |myVote|}}
+                {{!-- User has voted --}}
+                {{> surveyQuestionVoted question=../../../.. options=optionsArray responses=questionResponses userVote=myVote userProfile=@root.userProfile}}
+              {{else}}
+                {{!-- User has not voted --}}
+                {{> surveyQuestionNew question=../../.. options=optionsArray responses=questionResponses userProfile=@root.userProfile}}
+              {{/with}}
+            {{/with}}
+          {{/with}}
+        {{/with}}
+        
+      {{/with}}
+    {{/each}}
+  {{else}}
+    <div class="no-questions">
+      <div class="icon">📋</div>
+      <p>No survey questions available</p>
+    </div>
+  {{/if}}
+</div>
+
+{{!-- Partial: Question where user has already voted --}}
+{{#*inline "surveyQuestionVoted"}}
+<div class="question-card" data-question-id="{{question.ID}}">
+  <fluent-tabs activeid="results-tab-{{question.ID}}">
+    <fluent-tab id="vote-tab-{{question.ID}}">Your Vote</fluent-tab>
+    <fluent-tab id="results-tab-{{question.ID}}">Results</fluent-tab>
+    
+    {{!-- Vote Tab (shows their previous answer) --}}
+    <fluent-tab-panel id="vote-panel-{{question.ID}}">
+      <div style="padding: 20px 0;">
+        <h2 class="question-text">{{question.Title}}</h2>
+        
+        <div class="already-voted">
+          <span class="icon">✓</span>
+          <span>You voted: <strong>{{userVote.Answer}}</strong></span>
+        </div>
+        
+        <div class="answer-options">
+          {{#each options}}
+            <div class="answer-option {{#eq this ../userVote.Answer}}selected{{/eq}}" style="pointer-events: none; opacity: 0.8;">
+              <input type="radio" name="survey-{{../question.ID}}" id="opt-{{../question.ID}}-{{@index}}" 
+                     {{#eq this ../userVote.Answer}}checked{{/eq}} disabled>
+              <label for="opt-{{../question.ID}}-{{@index}}">{{this}}</label>
+            </div>
+          {{/each}}
+        </div>
+        
+        <p style="margin-top: 16px; font-size: 13px; color: var(--colorNeutralForeground3);">
+          You've already submitted your response. View the Results tab to see how others voted.
+        </p>
+      </div>
+    </fluent-tab-panel>
+    
+    {{!-- Results Tab --}}
+    <fluent-tab-panel id="results-panel-{{question.ID}}">
+      {{> surveyResults question=question options=options responses=responses userVote=userVote}}
+    </fluent-tab-panel>
+  </fluent-tabs>
+</div>
+{{/inline}}
+
+{{!-- Partial: Question where user has not voted --}}
+{{#*inline "surveyQuestionNew"}}
+<div class="question-card" data-question-id="{{question.ID}}">
+  <fluent-tabs activeid="vote-tab-{{question.ID}}">
+    <fluent-tab id="vote-tab-{{question.ID}}">Vote</fluent-tab>
+    <fluent-tab id="results-tab-{{question.ID}}">Results</fluent-tab>
+    
+    {{!-- Vote Tab --}}
+    <fluent-tab-panel id="vote-panel-{{question.ID}}">
+      <div style="padding: 20px 0;">
+        <h2 class="question-text">{{question.Title}}</h2>
+        
+        <div id="formMessage-{{question.ID}}" class="form-message"></div>
+        
+        {{#hbwp-form endpoint="submitSurvey" id=(concat "surveyForm-" question.ID)}}
+          {{hbwp-hidden name="QuestionId" value=question.ID}}
+          {{hbwp-hidden name="RespondentEmail" value=userProfile.Email}}
+          
+          <div class="answer-options" id="options-{{question.ID}}">
+            {{#each options}}
+              <div class="answer-option" onclick="selectSurveyOption(this, '{{../question.ID}}', '{{this}}')">
+                <input type="radio" name="Answer" id="opt-{{../question.ID}}-{{@index}}" value="{{this}}" required>
+                <label for="opt-{{../question.ID}}-{{@index}}">{{this}}</label>
+              </div>
+            {{/each}}
+          </div>
+          
+          <div class="form-actions">
+            {{hbwp-submit label="Submit Vote" appearance="primary"}}
+          </div>
+        {{/hbwp-form}}
+      </div>
+    </fluent-tab-panel>
+    
+    {{!-- Results Tab (preview before voting) --}}
+    <fluent-tab-panel id="results-panel-{{question.ID}}">
+      {{> surveyResults question=question options=options responses=responses userVote=null}}
+    </fluent-tab-panel>
+  </fluent-tabs>
+</div>
+{{/inline}}
+
+{{!-- Partial: Results display with bar chart --}}
+{{#*inline "surveyResults"}}
+<div class="results-container">
+  <h2 class="question-text">{{question.Title}}</h2>
+  
+  <div class="results-summary">
+    <div class="total">
+      <strong>{{length responses}}</strong> total responses
+    </div>
+  </div>
+  
+  <div class="bar-chart">
+    {{#each options}}
+      {{!-- Count responses for this option --}}
+      {{#with (filter ../responses "Answer" this) as |optionResponses|}}
+        {{#with (length optionResponses) as |count|}}
+          {{#with (length ../../responses) as |total|}}
+            {{#with (percentage count total) as |pct|}}
+              <div class="bar-item {{#eq this ../../userVote.Answer}}my-vote{{/eq}}">
+                <div class="bar-label">
+                  <span class="bar-label-text">{{../../this}}</span>
+                  <span class="bar-label-count">{{count}} vote{{#unless (eq count 1)}}s{{/unless}}</span>
+                </div>
+                <div class="bar-track">
+                  <div class="bar-fill {{#eq pct 0}}empty{{/eq}}" style="width: {{pct}}%;">
+                    <span class="bar-percentage">{{pct}}%</span>
+                  </div>
+                </div>
+              </div>
+            {{/with}}
+          {{/with}}
+        {{/with}}
+      {{/with}}
+    {{/each}}
+  </div>
+</div>
+{{/inline}}
+
+<script>
+  // Handle option selection styling
+  function selectSurveyOption(element, questionId, value) {
+    // Remove selected class from siblings
+    var container = document.getElementById('options-' + questionId);
+    if (container) {
+      var options = container.querySelectorAll('.answer-option');
+      options.forEach(function(opt) {
+        opt.classList.remove('selected');
+      });
+    }
+    // Add selected class to clicked option
+    element.classList.add('selected');
+    // Check the radio button
+    var radio = element.querySelector('input[type="radio"]');
+    if (radio) {
+      radio.checked = true;
+    }
+  }
+  
+  // Listen for form submission results
+  document.addEventListener('hbwp-form-result', function(e) {
+    var result = e.detail;
+    
+    // Find the message element for this form
+    var forms = document.querySelectorAll('[id^="surveyForm-"]');
+    forms.forEach(function(form) {
+      var questionId = form.id.replace('surveyForm-', '');
+      var messageEl = document.getElementById('formMessage-' + questionId);
+      
+      if (messageEl) {
+        if (result.success) {
+          messageEl.className = 'form-message success';
+          messageEl.textContent = '✓ Thank you for voting! Refresh the page to see updated results.';
+          // Disable the form
+          form.querySelectorAll('input, button').forEach(function(el) {
+            el.disabled = true;
+          });
+        } else if (result.error) {
+          messageEl.className = 'form-message error';
+          messageEl.textContent = '✗ Error: ' + result.error;
+        }
+      }
+    });
+  });
+</script>
