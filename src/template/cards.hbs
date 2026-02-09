@@ -1,0 +1,242 @@
+{{!-- 
+  Fluent UI Card Grid Template
+  ============================
+  Displays list items as responsive cards using Fluent UI Web Components.
+  
+  Available Data:
+  - items: Primary list data from configured list/view
+  - user: Current user profile information
+  - wpId: Web part instance ID
+--}}
+
+<style>
+  .card-grid-container-{{wpId}} {
+    font-family: var(--body-font, 'Segoe UI', sans-serif);
+    padding: 16px;
+  }
+
+  .card-grid-header-{{wpId}} {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .card-grid-title-{{wpId}} {
+    font-size: 24px;
+    font-weight: 600;
+    color: #323130;
+    margin: 0;
+  }
+
+  .card-grid-{{wpId}} {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+  }
+
+  .item-card-{{wpId}} {
+    padding: 0;
+    overflow: hidden;
+    transition: box-shadow 0.2s ease;
+  }
+
+  .item-card-{{wpId}}:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+
+  .card-header-{{wpId}} {
+    background: linear-gradient(135deg, #0078d4, #00bcf2);
+    padding: 16px;
+    color: white;
+  }
+
+  .card-body-{{wpId}} {
+    padding: 16px;
+  }
+
+  .card-title-{{wpId}} {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    color: #323130;
+  }
+
+  .card-description-{{wpId}} {
+    font-size: 14px;
+    color: #605e5c;
+    margin: 0 0 12px 0;
+    line-height: 1.5;
+  }
+
+  .card-meta-{{wpId}} {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #edebe9;
+  }
+
+  .card-actions-{{wpId}} {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .empty-state-{{wpId}} {
+    text-align: center;
+    padding: 60px 20px;
+    background: #faf9f8;
+    border-radius: 8px;
+  }
+
+  .empty-state-icon-{{wpId}} {
+    font-size: 48px;
+    margin-bottom: 16px;
+  }
+</style>
+
+<div class="card-grid-container-{{wpId}}" data-wpid="{{wpId}}">
+  
+  {{!-- Header --}}
+  <div class="card-grid-header-{{wpId}}">
+    <h2 class="card-grid-title-{{wpId}}">{{#if title}}{{title}}{{else}}Items{{/if}}</h2>
+    <fluent-badge appearance="filled" color="brand">{{items.length}} items</fluent-badge>
+  </div>
+
+  {{#if items.length}}
+    <div class="card-grid-{{wpId}}">
+      {{#each items}}
+        <fluent-card class="item-card-{{../wpId}}">
+          {{!-- Optional colored header - uncomment if you want it
+          <div class="card-header-{{../wpId}}">
+            <strong>{{Title}}</strong>
+          </div>
+          --}}
+          
+          <div class="card-body-{{../wpId}}">
+            <h3 class="card-title-{{../wpId}}">{{Title}}</h3>
+            
+            {{#if Description}}
+              <p class="card-description-{{../wpId}}">{{Description}}</p>
+            {{/if}}
+
+            {{!-- Show any custom fields you have --}}
+            {{#if Status}}
+              <fluent-badge 
+                color="{{#eq Status 'Active'}}success{{else}}{{#eq Status 'Pending'}}warning{{else}}informative{{/eq}}{{/eq}}"
+                size="small">
+                {{Status}}
+              </fluent-badge>
+            {{/if}}
+
+            {{#if Category}}
+              <fluent-badge appearance="outline" size="small" style="margin-left: 4px;">
+                {{Category}}
+              </fluent-badge>
+            {{/if}}
+
+            {{!-- Meta info with author/date if available --}}
+            {{#if Author}}
+              <div class="card-meta-{{../wpId}}">
+                <fluent-avatar name="{{Author.Title}}" size="24"></fluent-avatar>
+                <span style="font-size: 12px; color: #605e5c;">{{Author.Title}}</span>
+                {{#if Modified}}
+                  <span style="font-size: 12px; color: #a19f9d; margin-left: auto;">{{Modified}}</span>
+                {{/if}}
+              </div>
+            {{/if}}
+
+            {{!-- Action buttons --}}
+            <div class="card-actions-{{../wpId}}">
+              {{#if FileRef}}
+                <fluent-button appearance="accent" size="small" href="{{FileRef}}" target="_blank">
+                  Open
+                </fluent-button>
+              {{/if}}
+              <fluent-button appearance="outline" size="small" 
+                onclick="document.getElementById('detail-dialog-{{../wpId}}-{{@index}}').show()">
+                Details
+              </fluent-button>
+            </div>
+          </div>
+        </fluent-card>
+
+        {{!-- Detail Dialog for this item --}}
+        <fluent-dialog id="detail-dialog-{{../wpId}}-{{@index}}" modal-type="modal" hidden>
+          <div slot="title">{{Title}}</div>
+          <fluent-button slot="title-action" appearance="subtle" onclick="this.closest('fluent-dialog').hide()" title="Close">
+            ✕
+          </fluent-button>
+          <div style="padding: 20px; min-width: 350px;">
+            {{#if Description}}
+              <p style="margin: 0 0 16px 0; color: #605e5c;">{{Description}}</p>
+            {{/if}}
+            
+            <div style="display: grid; gap: 12px;">
+              {{#if Status}}
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-weight: 600;">Status:</span>
+                  <fluent-badge 
+                    color="{{#eq Status 'Active'}}success{{else}}{{#eq Status 'Pending'}}warning{{else}}informative{{/eq}}{{/eq}}">
+                    {{Status}}
+                  </fluent-badge>
+                </div>
+              {{/if}}
+              
+              {{#if Category}}
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-weight: 600;">Category:</span>
+                  <span>{{Category}}</span>
+                </div>
+              {{/if}}
+              
+              {{#if Author}}
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-weight: 600;">Author:</span>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <fluent-avatar name="{{Author.Title}}" size="20"></fluent-avatar>
+                    <span>{{Author.Title}}</span>
+                  </div>
+                </div>
+              {{/if}}
+              
+              {{#if Created}}
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="font-weight: 600;">Created:</span>
+                  <span style="color: #605e5c;">{{Created}}</span>
+                </div>
+              {{/if}}
+              
+              {{#if Modified}}
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="font-weight: 600;">Modified:</span>
+                  <span style="color: #605e5c;">{{Modified}}</span>
+                </div>
+              {{/if}}
+            </div>
+          </div>
+          {{#if FileRef}}
+            <fluent-button slot="action" appearance="accent" href="{{FileRef}}" target="_blank">
+              Open Item
+            </fluent-button>
+          {{/if}}
+          <fluent-button slot="action" appearance="outline" onclick="this.closest('fluent-dialog').hide()">
+            Close
+          </fluent-button>
+        </fluent-dialog>
+
+      {{/each}}
+    </div>
+  {{else}}
+    <div class="empty-state-{{wpId}}">
+      <div class="empty-state-icon-{{wpId}}">📋</div>
+      <fluent-text size="500" weight="semibold">No items found</fluent-text>
+      <p style="color: #605e5c; margin-top: 8px;">Configure a list and view in the web part settings to display items here.</p>
+    </div>
+  {{/if}}
+
+</div>

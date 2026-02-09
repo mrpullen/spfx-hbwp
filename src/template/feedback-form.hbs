@@ -1,0 +1,242 @@
+{{!-- 
+  Feedback Form Template
+  
+  This template demonstrates the form submission capabilities.
+  Configure a submit endpoint with key "submitFeedback" in the web part properties.
+  
+  For SharePoint List endpoints:
+  - Create a list with columns: Title (text), Description (multi-line text), 
+    Category (choice: Bug/Feature/General), Priority (choice: Low/Medium/High), 
+    Status (choice: New/In Progress/Resolved)
+  
+  For HTTP endpoints:
+  - Configure the URL, auth type, and method (POST)
+  - The endpoint will receive JSON with form field values
+  
+  Available helpers:
+  - {{#hbwp-form}} - Creates a form bound to a submit endpoint
+  - {{hbwp-input}} - Creates a Fluent UI text field
+  - {{hbwp-textarea}} - Creates a Fluent UI textarea
+  - {{hbwp-select}} - Creates a Fluent UI select dropdown
+  - {{hbwp-checkbox}} - Creates a Fluent UI checkbox
+  - {{hbwp-hidden}} - Creates a hidden input
+  - {{hbwp-submit}} - Creates a submit button
+--}}
+
+<style>
+  .feedback-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: var(--fontFamilyBase);
+  }
+  
+  .feedback-header {
+    margin-bottom: 24px;
+    text-align: center;
+  }
+  
+  .feedback-header h1 {
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    color: var(--colorNeutralForeground1);
+  }
+  
+  .feedback-header p {
+    color: var(--colorNeutralForeground2);
+    margin: 0;
+  }
+  
+  .form-row {
+    margin-bottom: 16px;
+  }
+  
+  .form-row-inline {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  
+  .form-row-inline > * {
+    flex: 1;
+  }
+  
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--colorNeutralStroke1);
+  }
+  
+  /* Success/Error message styling */
+  .form-message {
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+    display: none;
+  }
+  
+  .form-message.success {
+    background-color: var(--colorStatusSuccessBackground1);
+    color: var(--colorStatusSuccessForeground1);
+    border: 1px solid var(--colorStatusSuccessBorder1);
+  }
+  
+  .form-message.error {
+    background-color: var(--colorStatusDangerBackground1);
+    color: var(--colorStatusDangerForeground1);
+    border: 1px solid var(--colorStatusDangerBorder1);
+  }
+  
+  /* User info display */
+  .user-info {
+    background-color: var(--colorNeutralBackground2);
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: var(--colorBrandBackground);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+  }
+  
+  .user-details {
+    flex: 1;
+  }
+  
+  .user-name {
+    font-weight: 600;
+    color: var(--colorNeutralForeground1);
+  }
+  
+  .user-email {
+    font-size: 12px;
+    color: var(--colorNeutralForeground2);
+  }
+</style>
+
+<div class="feedback-container">
+  <div class="feedback-header">
+    <h1>📝 Submit Feedback</h1>
+    <p>We'd love to hear from you! Share your thoughts, report bugs, or suggest new features.</p>
+  </div>
+  
+  {{!-- Display current user info --}}
+  <div class="user-info">
+    <div class="user-avatar">
+      {{#if userProfile.DisplayName}}
+        {{substring userProfile.DisplayName 0 1}}
+      {{else}}
+        ?
+      {{/if}}
+    </div>
+    <div class="user-details">
+      <div class="user-name">{{userProfile.DisplayName}}</div>
+      <div class="user-email">{{userProfile.Email}}</div>
+    </div>
+  </div>
+  
+  {{!-- Success/Error message placeholder --}}
+  <div id="formMessage" class="form-message"></div>
+  
+  {{!-- The form - bound to the "submitFeedback" endpoint --}}
+  {{#hbwp-form endpoint="submitFeedback" id="feedbackForm"}}
+    
+    {{!-- Hidden field to capture submitter email --}}
+    {{hbwp-hidden name="SubmitterEmail" value=userProfile.Email}}
+    
+    <div class="form-row">
+      {{hbwp-input 
+        name="Title" 
+        label="Subject" 
+        placeholder="Brief description of your feedback"
+        required=true
+        maxlength=255
+      }}
+    </div>
+    
+    <div class="form-row-inline">
+      {{hbwp-select 
+        name="Category" 
+        label="Category"
+        required=true
+        options="Bug|Feature Request|General Feedback|Question"
+      }}
+      
+      {{hbwp-select 
+        name="Priority" 
+        label="Priority"
+        required=true
+        options="Low|Medium|High"
+      }}
+    </div>
+    
+    <div class="form-row">
+      {{hbwp-textarea 
+        name="Description" 
+        label="Description" 
+        placeholder="Please provide as much detail as possible..."
+        rows=6
+        required=true
+      }}
+    </div>
+    
+    <div class="form-row">
+      {{hbwp-checkbox 
+        name="ContactMe" 
+        label="I'd like to be contacted about this feedback"
+      }}
+    </div>
+    
+    {{!-- Status field - default to "New" for new submissions --}}
+    {{hbwp-hidden name="Status" value="New"}}
+    
+    <div class="form-actions">
+      <fluent-button appearance="secondary" type="button" onclick="this.closest('form').reset()">
+        Clear
+      </fluent-button>
+      {{hbwp-submit label="Submit Feedback" appearance="primary"}}
+    </div>
+    
+  {{/hbwp-form}}
+</div>
+
+<script>
+  // Listen for form submission results
+  document.addEventListener('hbwp-form-result', function(e) {
+    var messageEl = document.getElementById('formMessage');
+    if (!messageEl) return;
+    
+    var result = e.detail;
+    messageEl.style.display = 'block';
+    
+    if (result.success) {
+      messageEl.className = 'form-message success';
+      messageEl.textContent = '✓ Thank you! Your feedback has been submitted successfully.';
+      // Reset the form on success
+      var form = document.getElementById('feedbackForm');
+      if (form) form.reset();
+      // Hide message after 5 seconds
+      setTimeout(function() {
+        messageEl.style.display = 'none';
+      }, 5000);
+    } else {
+      messageEl.className = 'form-message error';
+      messageEl.textContent = '✗ Error: ' + (result.error || 'Failed to submit feedback. Please try again.');
+    }
+  });
+</script>
