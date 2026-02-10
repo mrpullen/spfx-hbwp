@@ -1,0 +1,292 @@
+{{!-- 
+  Announcements Template (SharePoint Theme-Aware)
+  ================================================
+  Displays announcements from a SharePoint list as vertical cards.
+  Clicking a title opens a dialog showing the HTML description.
+
+  Expected List Columns:
+  - Title: Single line of text
+  - Description: Rich text (HTML)
+  
+  SharePoint Theme Integration:
+  Uses SharePoint CSS custom properties injected on the page so colors
+  automatically adapt to whichever site theme is applied.
+
+  Available Data:
+  - items: Primary list data from configured list/view
+  - user: Current user profile information
+  - wpId: Web part instance ID
+--}}
+
+<style>
+  /* ── SharePoint Theme Variable Reference ──
+     SharePoint injects these CSS custom properties on every page:
+       --bodyText           (text color)
+       --bodyBackground     (page background)
+       --themePrimary       (brand / accent color)
+       --themeDark          (darker brand)
+       --themeDarker        (darkest brand)
+       --themeLighter       (lighter brand)
+       --themeLighterAlt    (lightest brand tint)
+       --neutralLighter     (subtle border / divider)
+       --neutralLight       (light neutral)
+       --neutralQuaternary  (hover backgrounds)
+       --neutralPrimary     (primary text)
+       --neutralSecondary   (secondary / muted text)
+       --white              (card surface)
+  */
+
+  .announcements-container-{{wpId}} {
+    font-family: var(--body-font, 'Segoe UI', sans-serif);
+    color: var(--bodyText, #323130);
+    padding: 16px;
+    max-width: 960px;
+  }
+
+  /* ── Header ── */
+  .announcements-header-{{wpId}} {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--themePrimary, #0078d4);
+  }
+
+  .announcements-title-{{wpId}} {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--neutralPrimary, var(--bodyText, #323130));
+    margin: 0;
+  }
+
+  /* ── Card list – one card per row, stacked vertically ── */
+  .announcements-list-{{wpId}} {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .announcement-card-{{wpId}} {
+    --card-padding: 0px;
+    border: none;
+    border-radius: 2px;
+    transition: box-shadow 0.2s ease;
+    overflow: hidden;
+  }
+
+  /* Also target via container in case class→classname on web component */
+  .announcements-list-{{wpId}} fluent-card {
+    --card-padding: 0px;
+    border: none;
+    border-left: 4px solid var(--themePrimary, #0078d4);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .announcements-list-{{wpId}} fluent-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    border-left-color: var(--themeLighter, #c7e0f4);
+  }
+
+  .announcement-card-body-{{wpId}} {
+    padding: 8px 12px;
+    background: var(--themeDarker, #004578);
+    color: var(--themeLighterAlt, #eff6fc);
+  }
+
+  .announcement-card-title-{{wpId}} {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--themeLighterAlt, #eff6fc);
+    margin: 0;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+    text-align: left;
+    font-family: inherit;
+    text-decoration: none;
+    display: inline;
+  }
+
+  /* Target button via container in case class→classname on web component */
+  .announcement-card-body-{{wpId}} fluent-button {
+    color: var(--themeLighterAlt, #eff6fc);
+    --neutral-foreground-rest: var(--themeLighterAlt, #eff6fc);
+    background: transparent;
+    border: none;
+    padding: 0;
+    min-width: auto;
+  }
+
+  .announcement-card-body-{{wpId}} fluent-button::part(control) {
+    background: transparent;
+    color: var(--themeLighterAlt, #eff6fc);
+    padding: 0;
+  }
+
+  .announcement-card-body-{{wpId}} fluent-button::part(control):hover {
+    background: transparent;
+    text-decoration: underline;
+  }
+
+  .announcement-card-title-{{wpId}}:hover,
+  .announcement-card-body-{{wpId}} fluent-button:hover {
+    color: var(--themeLighterAlt, #eff6fc);
+    text-decoration: underline;
+  }
+
+  .announcement-card-title-{{wpId}}:focus-visible {
+    outline: 2px solid var(--themeLighter, #c7e0f4);
+    outline-offset: 2px;
+  }
+
+  .announcement-card-meta-{{wpId}} {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--themeLighter, #c7e0f4);
+  }
+
+  /* ── Dialog ── */
+
+  /* fluent-dialog overrides */
+  .announcements-container-{{wpId}} fluent-dialog {
+    --dialog-width: 640px;
+    --dialog-height: auto;
+    color: var(--bodyText, #323130);
+  }
+
+  .announcements-container-{{wpId}} fluent-dialog::part(control) {
+    border: none;
+    border-radius: 0;
+    padding: 0;
+  }
+
+  /* Dark title bar */
+  .ann-dialog-header-{{wpId}} {
+    background: var(--themeDarker, #004578);
+    color: var(--themeLighterAlt, #eff6fc);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .ann-dialog-header-{{wpId}} span {
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .ann-dialog-header-{{wpId}} fluent-button {
+    color: var(--themeLighterAlt, #eff6fc);
+    --neutral-foreground-rest: var(--themeLighterAlt, #eff6fc);
+    background: transparent;
+    border: none;
+    min-width: auto;
+    padding: 4px;
+  }
+
+  .ann-dialog-header-{{wpId}} fluent-button::part(control) {
+    background: transparent;
+  }
+
+  /* Body */
+  .announcement-dialog-body-{{wpId}} {
+    padding: 20px;
+    color: var(--bodyText, #323130);
+    line-height: 1.6;
+    overflow-y: auto;
+    max-height: 60vh;
+  }
+
+  .announcement-dialog-body-{{wpId}} img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Footer */
+  .ann-dialog-footer-{{wpId}} {
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid var(--neutralLighter, #edebe9);
+    padding: 12px 20px;
+  }
+
+  /* ── Empty state ── */
+  .announcements-empty-{{wpId}} {
+    text-align: center;
+    padding: 40px 20px;
+    background: var(--themeDarker, #004578);
+    border-radius: 4px;
+    color: var(--themeLighterAlt, #eff6fc);
+  }
+</style>
+
+<div class="announcements-container-{{wpId}}" data-wpid="{{wpId}}">
+
+  {{!-- Header --}}
+  <div class="announcements-header-{{wpId}}">
+    <h2 class="announcements-title-{{wpId}}">📢 Announcements</h2>
+    <fluent-badge appearance="filled" color="brand">{{items.length}} item{{#if (gt items.length 1)}}s{{/if}}</fluent-badge>
+  </div>
+
+  {{#if items.length}}
+    <div class="announcements-list-{{wpId}}">
+      {{#each items}}
+
+        {{!-- Announcement Card --}}
+        <fluent-card class="announcement-card-{{../wpId}}">
+          <div class="announcement-card-body-{{../wpId}}">
+            <fluent-button
+              class="announcement-card-title-{{../wpId}}"
+              appearance="lightweight"
+              onclick="document.getElementById('ann-dialog-{{../wpId}}-{{@index}}').show()"
+              aria-haspopup="dialog">
+              {{Title}}
+            </fluent-button>
+
+            {{#if Author}}
+            <div class="announcement-card-meta-{{../wpId}}">
+              <fluent-avatar name="{{Author.Title}}" size="20"></fluent-avatar>
+              <span>{{Author.Title}}</span>
+              {{#if Modified}}
+                <span style="margin-left: auto;">{{Modified}}</span>
+              {{/if}}
+            </div>
+            {{/if}}
+          </div>
+        </fluent-card>
+
+        {{!-- Detail Dialog for this announcement --}}
+        <fluent-dialog id="ann-dialog-{{../wpId}}-{{@index}}" modal-type="modal" hidden
+          onclick="if(event.target===this)this.hide()">
+          <div class="ann-dialog-header-{{../wpId}}">
+            <span>{{Title}}</span>
+            <fluent-button appearance="lightweight" onclick="this.closest('fluent-dialog').hide()" title="Close">
+              ✕
+            </fluent-button>
+          </div>
+          <div class="announcement-dialog-body-{{../wpId}}" style="min-width: 350px;">
+            {{{Description}}}
+          </div>
+          <div class="ann-dialog-footer-{{../wpId}}">
+            <fluent-button appearance="outline" onclick="this.closest('fluent-dialog').hide()">
+              Close
+            </fluent-button>
+          </div>
+        </fluent-dialog>
+
+      {{/each}}
+    </div>
+  {{else}}
+    <div class="announcements-empty-{{wpId}}">
+      <div style="font-size: 48px; margin-bottom: 16px;">📢</div>
+      <fluent-text size="500" weight="semibold">No announcements</fluent-text>
+      <p style="margin-top: 8px;">Configure an Announcements list in the web part settings.</p>
+    </div>
+  {{/if}}
+</div>
