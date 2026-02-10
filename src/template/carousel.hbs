@@ -1,279 +1,111 @@
-<style type="text/css">
-    /*https://css-tricks.com/css-only-carousel/*/
-.carousel  * {
-  box-sizing: border-box;
-  scrollbar-color: transparent transparent; /* thumb and track color */
-  scrollbar-width: 0px;
-}
+{{!-- 
+  Carousel Template (fluentui-carousel web component)
+  ====================================================
+  Uses <fluentui-carousel> from @mrpullen/fluentui-carousel.
+  Auto-plays with looping; prev/next controls and indicators are built in.
 
-.carousel *::-webkit-scrollbar {
-  width: 0;
-}
+  Expected List Columns:
+  - Title: Single line of text
+  (Customize the slide markup below for your list schema.)
 
-.carousel *::-webkit-scrollbar-track {
-  background: transparent;
-}
+  SharePoint Theme Integration:
+  Maps SP CSS custom properties to the carousel's own CSS variables.
 
-.carousel *::-webkit-scrollbar-thumb {
-  background: transparent;
-  border: none;
-}
+  Available Data:
+  - items: Primary list data from configured list/view
+  - user: Current user profile information
+  - wpId: Web part instance ID
+--}}
 
-.carousel * {
-  -ms-overflow-style: none;
-}
-
-@keyframes tonext {
-  75% {
-    left: 0;
-  }
-  95% {
-    left: 100%;
-  }
-  98% {
-    left: 100%;
-  }
-  99% {
-    left: 0;
-  }
-}
-
-@keyframes tostart {
-  75% {
-    left: 0;
-  }
-  95% {
-    left: -300%;
-  }
-  98% {
-    left: -300%;
-  }
-  99% {
-    left: 0;
-  }
-}
-
-@keyframes snap {
-  96% {
-    scroll-snap-align: center;
-  }
-  97% {
-    scroll-snap-align: none;
-  }
-  99% {
-    scroll-snap-align: none;
-  }
-  100% {
-    scroll-snap-align: center;
-  }
-}
-
-
-.carousel ol, li {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.carousel {
-  position: relative;
-  filter: drop-shadow(0 0 10px #0003);
-  perspective: 100px;
-  height:300px;
-}
-
-.carousel__viewport {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  display: flex;
-  overflow-x: scroll;
-  counter-reset: item;
-  scroll-behavior: smooth;
-  scroll-snap-type: x mandatory;
-}
-
-.carousel__slide {
-  position: relative;
-  flex: 0 0 100%;
-  width: 100%;
- /* background-color: #f99; */
-  counter-increment: item;
-}
-
-/*.carousel__slide:nth-child(even) {
-  background-color: #99f;
-}
-*/
-
-.carousel__slide:before {
-  content: counter(item);
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate3d(-50%,-40%,70px);
-  color: #fff;
-  font-size: 2em;
-}
-
-.carousel__snapper {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  scroll-snap-align: center;
-}
-
-@media (hover: hover) {
-  .carousel__snapper {
-    animation-name: tonext, snap;
-    animation-timing-function: ease;
-    animation-duration: 4s;
-    animation-iteration-count: infinite;
+<style>
+  .carousel-wrapper-{{wpId}} {
+    width: 100%;
+    max-width: 960px;
   }
 
-  .carousel__slide:last-child .carousel__snapper {
-    animation-name: tostart, snap;
+  .carousel-wrapper-{{wpId}} fluentui-carousel {
+    --carousel-controls: var(--themePrimary, #0078d4);
+    --carousel-controls-hover: var(--themeDarker, #004578);
+    --carousel-controls-active: var(--themeDark, #005a9e);
+    --carousel-controls-hover-background: var(--neutralLighterAlt, rgba(255, 255, 255, 0.4));
+    --carousel-slide-transition: transform 0.5s ease;
+    --carousel-indicator-width: 10px;
+    --carousel-indicator-height: 10px;
+    --carousel-indicator-margin: 0 3px;
+    --carousel-indicator-border-radius: 50%;
+    --carousel-indicator-opacity: 0.5;
+    width: 100%;
+    min-height: 200px;
   }
-}
 
-@media (prefers-reduced-motion: reduce) {
-  .carousel__snapper {
-    animation-name: none;
+  .carousel-slide-{{wpId}} {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    min-height: 200px;
   }
-}
 
-.carousel:hover .carousel__snapper,
-.carousel:focus-within .carousel__snapper {
-  animation-name: none;
-}
+  .carousel-slide-{{wpId}} fluent-card {
+    padding: 20px;
+    width: 100%;
+    max-width: 720px;
+    background: var(--white, #ffffff);
+    color: var(--bodyText, #323130);
+    border: 1px solid var(--neutralLighter, #edebe9);
+    border-left: 4px solid var(--themePrimary, #0078d4);
+    border-radius: 2px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
 
-.carousel__navigation {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  text-align: center;
-}
+  .carousel-slide-title-{{wpId}} {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--neutralPrimary, #323130);
+    margin: 0 0 8px 0;
+  }
 
-.carousel__navigation-list,
-.carousel__navigation-item {
-  display: inline-block;
-}
+  .carousel-slide-meta-{{wpId}} {
+    font-size: 12px;
+    color: var(--neutralSecondary, #605e5c);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
 
-.carousel__navigation-button {
-  display: inline-block;
-  width: 1.5rem;
-  height: 1.5rem;
-  background-color: #333;
-  background-clip: content-box;
-  border: 0.25rem solid transparent;
-  border-radius: 50%;
-  font-size: 0;
-  transition: transform 0.1s;
-}
-
-.carousel::before,
-.carousel::after,
-.carousel__prev,
-.carousel__next {
-  position: absolute;
-  top: 0;
-  margin-top: 12.5%;
-  width: 2rem;
-  height: 2rem;
-  transform: translateY(-50%);
-  border-radius: 50%;
-  font-size: 0;
-  outline: 0;
-}
-
-.carousel::before,
-.carousel__prev {
-  left: -1rem;
-}
-
-.carousel::after,
-.carousel__next {
-  right: -1rem;
-}
-
-.carousel::before,
-.carousel::after {
-  content: '';
-  z-index: 1;
-  background-color: #333;
-  background-size: 1.5rem 1.5rem;
-  background-repeat: no-repeat;
-  background-position: center center;
-  color: #fff;
-  font-size: 2.5rem;
-  line-height: 2rem;
-  text-align: center;
-  pointer-events: none;
-}
-
-.carousel::before {
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolygon points='0,50 80,100 80,0' fill='%23fff'/%3E%3C/svg%3E");
-}
-
-.carousel::after {
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolygon points='100,50 20,100 20,0' fill='%23fff'/%3E%3C/svg%3E");
-}
-
-fluent-card {
-    padding:10px;
-    border: 1px solid black;
-    
-}
-
+  .carousel-empty-{{wpId}} {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--neutralSecondary, #605e5c);
+  }
 </style>
 
-<div style="width:100%;max-height:300px">
-<div class="carousel" aria-label="Gallery" style-"max-height:300px !important">
-  <ol class="carousel__viewport">
-      {{#each items }}
-       <li id="carousel__slide{{@index}}"
-        tabindex="0"
-        class="carousel__slide">
-          
-      <div class="carousel__snapper">
-           <fluent-card>
-                 {{Title}}
-           </fluent-card>
-           {{#if @first}}
-             <a href="#carousel__slide{{minus @root.items.length 1}}"
-           class="carousel__prev">Go to last slide</a>
-           {{else}}
-            <a href="#carousel__slide{{minus @index 1}}"
-           class="carousel__prev">Go to previous slide</a>
-           {{/if}}
-           {{#if @last}}
-              <a href="#carousel__slide0" class="carousel__next">Go to fist slide</a>
-           {{else}}
-            <a href="#carousel__slide{{plus @index 1}}" class="carousel__next">Go to next slide</a>
-           {{/if}}
-      </div>
-     
-    </li>
- 
-{{/each}}
-   
-   
-  </ol>
-  <aside class="carousel__navigation">
-    <ol class="carousel__navigation-list">
-    {{#each items}}
-      <li class="carousel__navigation-item">
-        <a href="#carousel__slide{{@index}}"
-           class="carousel__navigation-button">Go to slide {{@index}}</a>
-      </li>
+<div class="carousel-wrapper-{{wpId}}">
+  {{#if items.length}}
+    <fluentui-carousel autoplay="true" autoplay-interval="5000" loop="true"
+      aria-label="Item carousel">
+      {{#each items}}
+        <div class="carousel-slide-{{../wpId}}">
+          <fluent-card>
+            <h3 class="carousel-slide-title-{{../wpId}}">{{Title}}</h3>
+            {{#if Author}}
+            <div class="carousel-slide-meta-{{../wpId}}">
+              <fluent-avatar name="{{Author.Title}}" size="20"></fluent-avatar>
+              <span>{{Author.Title}}</span>
+              {{#if Modified}}
+                <span style="margin-left: auto;">{{Modified}}</span>
+              {{/if}}
+            </div>
+            {{/if}}
+          </fluent-card>
+        </div>
       {{/each}}
-     
-    </ol>
-  </aside>
-</div>
+    </fluentui-carousel>
+  {{else}}
+    <div class="carousel-empty-{{wpId}}">
+      <div style="font-size: 48px; margin-bottom: 12px;">🎠</div>
+      <fluent-text size="500" weight="semibold">No items to display</fluent-text>
+      <p style="margin-top: 8px;">Configure a list in the web part settings.</p>
+    </div>
+  {{/if}}
 </div>

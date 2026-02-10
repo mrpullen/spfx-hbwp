@@ -1,0 +1,331 @@
+{{!-- 
+  Metro UI Quick Links Template (SharePoint Theme-Aware)
+  ======================================================
+  Displays a grid of metro-style tile blocks with icons.
+  Uses --themeDarker as tile background and --themeLighterAlt for text.
+
+  Tiles:
+  - Email → Outlook
+  - GovTA → Time & Attendance portal
+  - Project Server → PWA
+  - Service Now → Service Now portal
+  - CLC → Central Learning Center
+  - My Actions → Opens a fluent-drawer with details
+
+  Available Data:
+  - items: Primary list data (used for My Actions count)
+  - user: Current user profile information
+  - wpId: Web part instance ID
+--}}
+
+<style>
+  .metro-container-{{wpId}} {
+    font-family: var(--body-font, 'Segoe UI', sans-serif);
+    padding: 16px;
+  }
+
+  .metro-grid-{{wpId}} {
+    display: grid;
+    grid-template-columns: repeat(3, 96px);
+    grid-template-rows: repeat(2, 96px);
+    gap: 8px;
+    justify-content: center;
+  }
+
+  /* ── Tile ── */
+  .metro-tile-{{wpId}} {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 0;
+    width: 96px;
+    height: 96px;
+    background: var(--themeDarker, #004578);
+    color: var(--themeLighterAlt, #eff6fc);
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+    text-decoration: none;
+    text-align: center;
+    transition: box-shadow 0.15s ease;
+    position: relative;
+    overflow: hidden;
+    font-family: inherit;
+  }
+
+  .metro-tile-{{wpId}}:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .metro-tile-{{wpId}}:active {
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .metro-tile-{{wpId}}:focus-visible {
+    outline: 2px solid var(--themeLighter, #c7e0f4);
+    outline-offset: 2px;
+  }
+
+  /* ── Icon ── */
+  .metro-icon-{{wpId}} {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+  }
+
+  .metro-icon-{{wpId}} svg {
+    width: 100%;
+    height: 100%;
+    fill: var(--themeLighterAlt, #eff6fc);
+  }
+
+  /* ── Label ── */
+  .metro-label-{{wpId}} {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    line-height: 1.2;
+  }
+
+  /* ── Hover overlay ── */
+  .metro-overlay-{{wpId}} {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: 0;
+    background: rgba(0, 0, 0, 0.40);
+    color: var(--white, #ffffff);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    text-align: center;
+    font-size: 9px;
+    line-height: 1.3;
+    font-weight: 400;
+    transform: translateY(100%);
+    transition: transform 0.25s ease;
+    pointer-events: none;
+  }
+
+  .metro-tile-{{wpId}}:hover .metro-overlay-{{wpId}} {
+    transform: translateY(0);
+  }
+
+  /* ── Badge on tile ── */
+  .metro-badge-{{wpId}} {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    background: var(--themePrimary, #0078d4);
+    color: var(--white, #ffffff);
+    font-size: 9px;
+    font-weight: 700;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    z-index: 2;
+  }
+
+  /* ── Drawer overrides ── */
+  .metro-container-{{wpId}} fluent-drawer {
+    --drawer-width: 400px;
+  }
+
+  .metro-container-{{wpId}} fluent-drawer [slot="title"] {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--neutralPrimary, var(--bodyText, #323130));
+  }
+
+  .metro-actions-list-{{wpId}} {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .metro-action-item-{{wpId}} {
+    padding: 14px 16px;
+    background: var(--neutralLighterAlt, #faf9f8);
+    border-radius: 6px;
+    border-left: 3px solid var(--themePrimary, #0078d4);
+    color: var(--bodyText, #323130);
+  }
+
+  .metro-action-item-{{wpId}} strong {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--neutralPrimary, #323130);
+  }
+
+  .metro-action-item-{{wpId}} span {
+    font-size: 13px;
+    color: var(--neutralSecondary, #605e5c);
+  }
+
+  .metro-actions-empty-{{wpId}} {
+    text-align: center;
+    padding: 40px 16px;
+    color: var(--neutralSecondary, #605e5c);
+  }
+
+  /* ── Responsive: stack to 2 cols on very narrow screens ── */
+  @media (max-width: 280px) {
+    .metro-grid-{{wpId}} {
+      grid-template-columns: repeat(2, 96px);
+      grid-template-rows: repeat(3, 96px);
+    }
+  }
+</style>
+
+<div class="metro-container-{{wpId}}" data-wpid="{{wpId}}">
+
+  <div class="metro-grid-{{wpId}}">
+
+    {{!-- ══════ Email ══════ --}}
+    <a class="metro-tile-{{wpId}}"
+       href="https://outlook.office.com"
+       target="_blank"
+       rel="noopener noreferrer"
+       title="Open Outlook">
+      <div class="metro-icon-{{wpId}}">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 2l-8 5-8-5h16zm0 12H4V8l8 5 8-5v10z"/>
+        </svg>
+      </div>
+      <span class="metro-label-{{wpId}}">Email</span>
+      <span class="metro-overlay-{{wpId}}">View your email inbox</span>
+    </a>
+
+    {{!-- ══════ GovTA ══════ --}}
+    <a class="metro-tile-{{wpId}}"
+       href="https://www.govta.us"
+       target="_blank"
+       rel="noopener noreferrer"
+       title="GovTA – Time &amp; Attendance">
+      <div class="metro-icon-{{wpId}}">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M19 3H18V1h-2v2H8V1H6v2H5C3.9 3 3 3.9 3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM5 6V5h14v1H5z"/>
+          <circle cx="15" cy="15" r="4" fill="none" stroke="currentColor" stroke-width="1.2" style="stroke: var(--themeLighterAlt, #eff6fc);"/>
+          <path d="M15 13v2.5l1.5 1" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="stroke: var(--themeLighterAlt, #eff6fc);"/>
+        </svg>
+      </div>
+      <span class="metro-label-{{wpId}}">GovTA</span>
+      <span class="metro-overlay-{{wpId}}">Time &amp; Attendance</span>
+    </a>
+
+    {{!-- ══════ Project Server ══════ --}}
+    <a class="metro-tile-{{wpId}}"
+       href="https://your-tenant.sharepoint.com/sites/pwa"
+       target="_blank"
+       rel="noopener noreferrer"
+       title="Project Server – PWA">
+      <div class="metro-icon-{{wpId}}">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 20h2V10H4v10zm4 0h2V4H8v16zm4 0h2v-6h-2v6zm4 0h2v-9h-2v9z"/>
+          <path d="M20 20h2V7h-2v13z" opacity="0.5"/>
+        </svg>
+      </div>
+      <span class="metro-label-{{wpId}}">Project Server</span>
+      <span class="metro-overlay-{{wpId}}">Project Web App</span>
+    </a>
+
+    {{!-- ══════ Service Now ══════ --}}
+    <a class="metro-tile-{{wpId}}"
+       href="https://your-instance.service-now.com/sp"
+       target="_blank"
+       rel="noopener noreferrer"
+       title="Service Now Portal">
+      <div class="metro-icon-{{wpId}}">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm0 2v12h16V6H4z"/>
+          <rect x="6" y="8" width="12" height="1.5" rx="0.5" opacity="0.4"/>
+          <rect x="6" y="11" width="8" height="1.5" rx="0.5" opacity="0.4"/>
+          <path d="M16.5 11l-2 2-1-1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--themeLighterAlt, #eff6fc);"/>
+        </svg>
+      </div>
+      <span class="metro-label-{{wpId}}">Service Now</span>
+      <span class="metro-overlay-{{wpId}}">IT Service Portal</span>
+    </a>
+
+    {{!-- ══════ CLC ══════ --}}
+    <a class="metro-tile-{{wpId}}"
+       href="https://your-clc-portal.example.com"
+       target="_blank"
+       rel="noopener noreferrer"
+       title="Central Learning Center">
+      <div class="metro-icon-{{wpId}}">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 3L1 9l4 2.2v6L12 21l7-3.8v-6L21 9.8V17h2V9L12 3zm0 2.2L19.4 9 12 12.8 4.6 9 12 5.2zM17 16.4l-5 2.7-5-2.7v-4.2l5 2.7 5-2.7v4.2z"/>
+        </svg>
+      </div>
+      <span class="metro-label-{{wpId}}">CLC</span>
+      <span class="metro-overlay-{{wpId}}">Central Learning Center</span>
+    </a>
+
+    {{!-- ══════ My Actions (opens drawer) ══════ --}}
+    <button class="metro-tile-{{wpId}}"
+            onclick="document.getElementById('actions-drawer-{{wpId}}').show()"
+            type="button"
+            title="My Actions">
+      {{#if items.length}}
+        <span class="metro-badge-{{wpId}}">{{items.length}}</span>
+      {{/if}}
+      <div class="metro-icon-{{wpId}}">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M19 3H5C3.9 3 3 3.9 3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/>
+          <path d="M9.5 7h5c.28 0 .5.22.5.5v1c0 .28-.22.5-.5.5h-5c-.28 0-.5-.22-.5-.5v-1c0-.28.22-.5.5-.5z" opacity="0.4"/>
+          <path d="M7.5 11h9c.28 0 .5.22.5.5s-.22.5-.5.5h-9c-.28 0-.5-.22-.5-.5s.22-.5.5-.5zm0 2.5h9c.28 0 .5.22.5.5s-.22.5-.5.5h-9c-.28 0-.5-.22-.5-.5s.22-.5.5-.5zm0 2.5h6c.28 0 .5.22.5.5s-.22.5-.5.5h-6c-.28 0-.5-.22-.5-.5s.22-.5.5-.5z" opacity="0.4"/>
+        </svg>
+      </div>
+      <span class="metro-label-{{wpId}}">My Actions</span>
+      <span class="metro-overlay-{{wpId}}">View pending actions</span>
+    </button>
+
+  </div>
+
+  {{!-- ══════ My Actions Drawer ══════ --}}
+  <fluent-drawer id="actions-drawer-{{wpId}}" position="end" modal-type="modal" hidden>
+    <div slot="title">My Actions</div>
+    <fluent-button slot="title-action" appearance="subtle" onclick="this.closest('fluent-drawer').hide()" title="Close">
+      ✕
+    </fluent-button>
+    <div style="padding: 20px;">
+      {{#if items.length}}
+        <fluent-message-bar intent="info" style="margin-bottom: 16px;">
+          You have <strong>{{items.length}}</strong> action{{#if (gt items.length 1)}}s{{/if}} pending.
+        </fluent-message-bar>
+        <ul class="metro-actions-list-{{wpId}}">
+          {{#each items}}
+            <li class="metro-action-item-{{../wpId}}">
+              <strong>{{Title}}</strong>
+              {{#if Description}}
+                <span>{{Description}}</span>
+              {{/if}}
+            </li>
+          {{/each}}
+        </ul>
+      {{else}}
+        <div class="metro-actions-empty-{{wpId}}">
+          <div style="font-size: 36px; margin-bottom: 12px;">✅</div>
+          <fluent-text size="400" weight="semibold">No pending actions</fluent-text>
+          <p style="margin-top: 8px;">You're all caught up!</p>
+        </div>
+      {{/if}}
+    </div>
+    <fluent-button slot="action" appearance="outline" onclick="this.closest('fluent-drawer').hide()">
+      Close
+    </fluent-button>
+  </fluent-drawer>
+
+</div>
