@@ -28,7 +28,7 @@ import "@pnp/sp/files";
 import { LogLevel, PnPLogging } from "@pnp/logging";
 import { allComponents, provideFluentDesignSystem } from '@fluentui/web-components';
 import { Carousel } from '@mrpullen/fluentui-carousel';
-import { UserProfileService, IUserProfile, CacheService } from './services';
+import { UserProfileService, IUserProfile, PageDataService, CacheService } from './services';
 
 /** Extended data source interface to include site picker data */
 interface IDataSourceConfig {
@@ -66,6 +66,8 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
   private sp?: SPFI = undefined;
   private userProfile?: IUserProfile = undefined;
   private userProfileService?: UserProfileService = undefined;
+  private pageData?: Record<string, any> = undefined;
+  private pageDataService?: PageDataService = undefined;
   private resolvedTemplate: string = '';
 
   protected async onInit(): Promise<void> {
@@ -78,6 +80,18 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
       this.userProfile = await this.userProfileService.getCurrentUserProfile();
     } catch (error) {
       console.error('Error loading user profile:', error);
+    }
+    
+    // Initialize page data service and load current page metadata
+    this.pageDataService = new PageDataService(this.sp);
+    try {
+      const listId = this.context.pageContext.list?.id?.toString();
+      const itemId = this.context.pageContext.listItem?.id;
+      if (listId && itemId) {
+        this.pageData = await this.pageDataService.getPageData(listId, itemId);
+      }
+    } catch (error) {
+      console.error('Error loading page data:', error);
     }
     
     // Load template from file if configured
@@ -110,6 +124,9 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
     // Also clear user profile cache
     const userCacheService = new CacheService({ keyPrefix: `hbwp_user_` });
     userCacheService.clearAll();
+    // Also clear page data cache
+    const pageCacheService = new CacheService({ keyPrefix: `hbwp_page_` });
+    pageCacheService.clearAll();
     this.render();
   }
 
@@ -331,6 +348,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
           timeoutMinutes: this.properties.cacheTimeoutMinutes ?? 15
         },
         userProfile: this.userProfile,
+        pageData: this.pageData,
         instanceId: this.context.instanceId
       }
     );
