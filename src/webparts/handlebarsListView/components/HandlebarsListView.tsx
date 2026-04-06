@@ -325,6 +325,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     const tokenContext: ITokenContext = {
       items: primaryItems,
       user: this.props.userProfile || {},
+      page: this.props.pageData || {},
       ...dataSources
     };
 
@@ -336,6 +337,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     const templateData: ITemplateData = {
       items: primaryItems,
       user: this.props.userProfile || {},
+      page: this.props.pageData || {},
       // Include instanceId for unique DOM element IDs when multiple web parts are on a page
       wpId: this.props.instanceId,
       instanceId: this.props.instanceId,

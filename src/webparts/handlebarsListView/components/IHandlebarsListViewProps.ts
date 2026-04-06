@@ -149,6 +149,8 @@ export interface IHandlebarsListViewProps {
   cacheOptions: ICacheOptions;
   /** Current user profile (loaded on init) */
   userProfile?: IUserProfile;
+  /** Current page metadata (loaded on init) */
+  pageData?: Record<string, any>;
   /** Web part instance ID for unique cache keys */
   instanceId: string;
 }
