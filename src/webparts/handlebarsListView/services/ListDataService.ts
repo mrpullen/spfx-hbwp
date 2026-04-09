@@ -17,6 +17,10 @@ export interface IListFetchConfig {
   listId: string;
   /** View GUID */
   viewId: string;
+  /** Optional CAML filter to merge with the view's Where clause.
+   *  Should be the inner CAML (e.g. <Eq><FieldRef Name='Status'/><Value Type='Text'>Active</Value></Eq>).
+   *  Tokens like {{user.email}} or {{page.Id}} should already be resolved before passing. */
+  camlFilter?: string;
 }
 
 /**
@@ -61,11 +65,11 @@ export class ListDataService {
   }
 
   /**
-   * Generates a unique cache key for a list/view combination
+   * Generates a unique cache key for a list/view/filter combination
    */
-  public getCacheKey(siteUrl: string, listId: string, viewId: string): string {
-    // Use btoa to create a safe key from the combination
-    return `list_${btoa(`${siteUrl}_${listId}_${viewId}`).replace(/[=+/]/g, '_')}`;
+  public getCacheKey(siteUrl: string, listId: string, viewId: string, camlFilter?: string): string {
+    const base = `${siteUrl}_${listId}_${viewId}${camlFilter ? `_${camlFilter}` : ''}`;
+    return `list_${btoa(base).replace(/[=+/]/g, '_')}`;
   }
 
   /**
@@ -81,7 +85,7 @@ export class ListDataService {
       return { items: [], fromCache: false, error: new Error('Missing required configuration') };
     }
 
-    const cacheKey = this.getCacheKey(siteUrl, listId, viewId);
+    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, config.camlFilter);
 
     try {
       if (this.cacheEnabled) {
@@ -94,14 +98,14 @@ export class ListDataService {
         // Use getOrFetch which handles mutex locking
         const items = await this.cacheService.getOrFetch(
           cacheKey,
-          async () => this.fetchFromSharePoint(siteUrl, listId, viewId),
+          async () => this.fetchFromSharePoint(siteUrl, listId, viewId, config.camlFilter),
           effectiveTimeout
         );
         
         return { items, fromCache: false };
       } else {
         // Cache disabled, fetch directly
-        const items = await this.fetchFromSharePoint(siteUrl, listId, viewId);
+        const items = await this.fetchFromSharePoint(siteUrl, listId, viewId, config.camlFilter);
         return { items, fromCache: false };
       }
     } catch (error) {
@@ -153,7 +157,7 @@ export class ListDataService {
    */
   public async refreshListData(config: IListFetchConfig): Promise<IListDataResult> {
     const { siteUrl, listId, viewId } = config;
-    const cacheKey = this.getCacheKey(siteUrl, listId, viewId);
+    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, config.camlFilter);
     
     // Remove from cache first
     this.cacheService.remove(cacheKey);
@@ -172,17 +176,51 @@ export class ListDataService {
   /**
    * Clears cached data for a specific list
    */
-  public clearListCache(siteUrl: string, listId: string, viewId: string): void {
-    const cacheKey = this.getCacheKey(siteUrl, listId, viewId);
+  public clearListCache(siteUrl: string, listId: string, viewId: string, camlFilter?: string): void {
+    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, camlFilter);
     this.cacheService.remove(cacheKey);
   }
 
   /**
    * Checks if data for a list is currently cached
    */
-  public isListCached(siteUrl: string, listId: string, viewId: string): boolean {
-    const cacheKey = this.getCacheKey(siteUrl, listId, viewId);
+  public isListCached(siteUrl: string, listId: string, viewId: string, camlFilter?: string): boolean {
+    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, camlFilter);
     return this.cacheService.has(cacheKey);
+  }
+
+  /**
+   * Merges an additional CAML filter into a view's ListViewXml.
+   * If the view already has a <Where> clause, the two are combined with <And>.
+   * If no <Where> exists, one is injected inside the <Query> element.
+   */
+  public mergeCamlFilter(viewXml: string, camlFilter: string): string {
+    if (!camlFilter || !camlFilter.trim()) return viewXml;
+
+    const hasWhere = /<Where>/i.test(viewXml);
+
+    if (hasWhere) {
+      // Extract existing <Where>...</Where> content and wrap both in <And>
+      return viewXml.replace(
+        /<Where>([\s\S]*?)<\/Where>/i,
+        `<Where><And>$1${camlFilter}</And></Where>`
+      );
+    }
+
+    // No existing <Where> — inject inside <Query> if present, otherwise wrap the whole view
+    const hasQuery = /<Query>/i.test(viewXml);
+    if (hasQuery) {
+      return viewXml.replace(
+        /<Query>/i,
+        `<Query><Where>${camlFilter}</Where>`
+      );
+    }
+
+    // No <Query> at all — inject before closing </View>
+    return viewXml.replace(
+      /<\/View>/i,
+      `<Query><Where>${camlFilter}</Where></Query></View>`
+    );
   }
 
   /**
@@ -191,7 +229,8 @@ export class ListDataService {
   private async fetchFromSharePoint(
     siteUrl: string,
     listId: string,
-    viewId: string
+    viewId: string,
+    camlFilter?: string
   ): Promise<Array<any>> {
     try {
       // Create a context for the target site
@@ -206,6 +245,12 @@ export class ListDataService {
       // Get the view's CAML query
       const view = await list.views.getById(viewId).select('ListViewXml')();
       
+      // Merge additional CAML filter if provided
+      let viewXml = view.ListViewXml;
+      if (camlFilter) {
+        viewXml = this.mergeCamlFilter(viewXml, camlFilter);
+      }
+      
       // Determine what to expand based on list type
       const expands: Array<string> = [];
       if (listInfo.BaseType === 1) {
@@ -215,7 +260,7 @@ export class ListDataService {
       
       // Execute the CAML query
       const items = await list.getItemsByCAMLQuery({
-        ViewXml: view.ListViewXml
+        ViewXml: viewXml
       }, ...expands);
 
       return items;

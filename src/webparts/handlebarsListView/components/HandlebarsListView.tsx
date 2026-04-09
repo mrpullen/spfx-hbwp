@@ -7,6 +7,27 @@ import helpers from 'handlebars-helpers'
 import ReactHtmlParser from 'react-html-parser';
 import { ListDataService, HttpDataService, FormSubmitService, generateFormHandlerScript, generateFormResponseHandlerScript, ITokenContext } from '../services';
 
+/**
+ * Resolves {{token}} expressions in a string using a context object.
+ * Supports dot-notation and array indexing (e.g. {{user.email}}, {{page.Id}}).
+ */
+function resolveTokens(template: string, context: ITokenContext): string {
+  if (!template) return template;
+  return template.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
+    try {
+      const parts = path.trim().replace(/\[(\d+)\]/g, '.$1').split('.');
+      let current: any = context;
+      for (const part of parts) {
+        if (current === undefined || current === null) return '';
+        current = current[part];
+      }
+      return current === undefined || current === null ? '' : String(current);
+    } catch {
+      return '';
+    }
+  });
+}
+
 interface IHandlebarsListViewState {
   html: string;
   visible: boolean;
@@ -147,6 +168,11 @@ Handlebars.registerHelper('concat', function(...args: any[]) {
   // Remove the last argument (Handlebars options object)
   const strings = args.slice(0, -1);
   return strings.join('');
+});
+
+// Custom helper: output data as formatted JSON for debugging
+Handlebars.registerHelper('json', function(context: any) {
+  return JSON.stringify(context, null, 2);
 });
 /* eslint-enable dot-notation */
 
@@ -315,13 +341,19 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
    * Loads all data including primary list, additional data sources, HTTP endpoints, and user profile
    */
   private async getAllData(): Promise<ITemplateData> {
-    // Get primary list data
-    const primaryItems = await this.getPrimaryListData();
+    // Build token context from user and page data (available before list fetches)
+    const filterTokenContext: ITokenContext = {
+      user: this.props.userProfile || {},
+      page: this.props.pageData || {}
+    };
 
-    // Get additional data sources
-    const dataSources = await this.getAdditionalDataSources();
+    // Get primary list data (with resolved CAML filter)
+    const primaryItems = await this.getPrimaryListData(filterTokenContext);
 
-    // Build initial template data for token context
+    // Get additional data sources (with resolved CAML filters)
+    const dataSources = await this.getAdditionalDataSources(filterTokenContext);
+
+    // Build full token context for HTTP endpoints (includes list data)
     const tokenContext: ITokenContext = {
       items: primaryItems,
       user: this.props.userProfile || {},
@@ -329,7 +361,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       ...dataSources
     };
 
-    // Get HTTP endpoint data (can use tokens from list data and user)
+    // Get HTTP endpoint data (can use tokens from list data, user, and page)
     const httpData = await this.getHttpEndpointData(tokenContext);
 
     // Build template data object with data sources spread at root level
@@ -351,17 +383,20 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
   /**
    * Gets primary list data using the ListDataService
    */
-  private async getPrimaryListData(): Promise<Array<any>> {
-    const { site, list, view } = this.props;
+  private async getPrimaryListData(tokenContext: ITokenContext): Promise<Array<any>> {
+    const { site, list, view, camlFilter } = this.props;
 
     if (!this.listDataService || !site?.url || !list || !view) {
       return [];
     }
 
+    const resolvedFilter = camlFilter ? resolveTokens(camlFilter, tokenContext) : undefined;
+
     const result = await this.listDataService.getListData({
       siteUrl: site.url,
       listId: list,
-      viewId: view
+      viewId: view,
+      camlFilter: resolvedFilter
     });
 
     return result.items;
@@ -370,7 +405,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
   /**
    * Gets all additional data sources using the ListDataService
    */
-  private async getAdditionalDataSources(): Promise<Record<string, Array<any>>> {
+  private async getAdditionalDataSources(tokenContext: ITokenContext): Promise<Record<string, Array<any>>> {
     const { dataSources } = this.props;
     const result: Record<string, Array<any>> = {};
 
@@ -389,7 +424,8 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
         config: {
           siteUrl: (ds.site?.url || ds.siteUrl) as string,
           listId: ds.listId,
-          viewId: ds.viewId
+          viewId: ds.viewId,
+          camlFilter: ds.camlFilter ? resolveTokens(ds.camlFilter, tokenContext) : undefined
         },
         timeoutMinutes: ds.cacheTimeoutMinutes
       }));

@@ -183,6 +183,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
       delete this.properties[`ds${index}Sites`];
       delete this.properties[`ds${index}List`];
       delete this.properties[`ds${index}View`];
+      delete this.properties[`ds${index}CamlFilter`];
       this.properties.dataSourceCount--;
       this.context.propertyPane.refresh();
       this.render();
@@ -307,6 +308,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
       const listId = this.properties[`ds${i}List`] as string;
       const viewId = this.properties[`ds${i}View`] as string;
       const cacheTimeoutMinutes = this.properties[`ds${i}CacheTimeout`] as number;
+      const camlFilter = this.properties[`ds${i}CamlFilter`] as string;
       
       if (key && sites && sites.length > 0 && listId && viewId) {
         dataSources.push({
@@ -314,6 +316,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
           site: sites[0],
           listId,
           viewId,
+          camlFilter: camlFilter || undefined,
           cacheTimeoutMinutes
         });
       }
@@ -339,6 +342,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
         site: this.properties.sites[0],
         list: this.properties.list,
         view: this.properties.view,
+        camlFilter: this.properties.camlFilter,
         dataSources: dataSources,
         httpEndpoints: httpEndpoints,
         submitEndpoints: submitEndpoints,
@@ -451,6 +455,13 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
                   context: this.context as any,
                   deferredValidationTime: 0,
                   key: 'viewPickerFieldId'
+                }),
+                PropertyPaneTextField('camlFilter', {
+                  label: 'CAML Filter (optional)',
+                  description: 'Additional CAML Where clause to merge with the view. Supports tokens: {{user.email}}, {{page.Id}}, etc. Example: <Eq><FieldRef Name="Status"/><Value Type="Text">Active</Value></Eq>',
+                  multiline: true,
+                  rows: 3,
+                  value: this.properties.camlFilter || ''
                 })
               ]
             }, 
@@ -559,7 +570,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
                   disabled: (this.properties.dataSourceCount || 0) === 0
                 }),
                 PropertyPaneLabel('dataSourcesHelp', {
-                  text: 'Access in template: {{#each keyName}}...{{/each}}. Primary list: {{#each items}}...{{/each}}. User: {{user.displayName}}'
+                  text: 'Access in template: {{#each keyName}}...{{/each}}. Primary list: {{#each items}}...{{/each}}. User: {{user.displayName}}. Page: {{page.Title}}. CAML filters support {{user.*}} and {{page.*}} tokens.'
                 })
               ]
             },
@@ -694,6 +705,13 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
             step: 1,
             showValue: true,
             value: this.properties[`ds${i}CacheTimeout`] ?? 15
+          }),
+          PropertyPaneTextField(`ds${i}CamlFilter`, {
+            label: 'CAML Filter (optional)',
+            description: 'Additional CAML Where clause. Supports tokens: {{user.email}}, {{page.Id}}',
+            multiline: true,
+            rows: 3,
+            value: this.properties[`ds${i}CamlFilter`] || ''
           })
         ]
       });

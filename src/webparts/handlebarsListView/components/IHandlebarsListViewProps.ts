@@ -15,6 +15,9 @@ export interface IListDataSource {
   listId: string;
   /** The view GUID */
   viewId: string;
+  /** Optional CAML filter to merge with the view's Where clause.
+   *  Supports tokens like {{user.email}} or {{page.Id}} */
+  camlFilter?: string;
   /** Cache timeout in minutes for this specific data source (overrides global) */
   cacheTimeoutMinutes?: number;
 }
@@ -137,6 +140,8 @@ export interface IHandlebarsListViewProps {
   site?: IPropertyFieldSite;
   list?: string;
   view?: string;
+  /** CAML filter for the primary list (supports tokens like {{user.email}}, {{page.Id}}) */
+  camlFilter?: string;
   /** Multiple list data sources */
   dataSources: IListDataSource[];
   /** HTTP endpoint data sources */
