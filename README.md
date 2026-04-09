@@ -110,12 +110,19 @@ Templates receive this data structure:
 ```javascript
 {
   items: [...],           // Primary list items
-  userProfile: {
-    DisplayName: "John Doe",
-    Email: "john@contoso.com",
-    PictureUrl: "...",
+  user: {
+    displayName: "John Doe",
+    email: "john@contoso.com",
+    pictureUrl: "...",
     // ... other profile properties
   },
+  page: {
+    Title: "My Page",
+    Id: 42,
+    AbsoluteUrl: "https://contoso.sharepoint.com/sites/hr/SitePages/My-Page.aspx",
+    // ... other page metadata
+  },
+  wpId: "abc-123",        // Web part instance ID
   // Additional data sources by key:
   users: [...],           // If you added a data source with key "users"
   products: [...],        // If you added a data source with key "products"
@@ -146,6 +153,7 @@ Templates receive this data structure:
 | `percentage` | Calculate percentage | `{{percentage count total}}` → `75` |
 | `substring` | Get substring | `{{substring name 0 1}}` → First letter |
 | `concat` | Concatenate strings | `{{concat "ID-" item.Id}}` → `ID-123` |
+| `json` | Output data as formatted JSON (for debugging) | `{{json items}}` → pretty-printed JSON |
 
 ### Form Helpers
 
@@ -354,6 +362,44 @@ Fluent UI provides design tokens as CSS variables:
 
 ---
 
+## CAML Filters
+
+Both the primary list and additional data sources support an optional **CAML Filter** field in the property pane. This lets you add a `<Where>` clause that is merged with the view's existing query.
+
+### Token Support
+
+CAML filters support `{{user.*}}` and `{{page.*}}` tokens that are resolved at runtime:
+
+```xml
+<!-- Filter by current user's email -->
+<Eq><FieldRef Name="AssignedTo" /><Value Type="Text">{{user.email}}</Value></Eq>
+
+<!-- Filter by current page ID -->
+<Eq><FieldRef Name="PageId" /><Value Type="Number">{{page.Id}}</Value></Eq>
+```
+
+### How It Works
+
+- If the view already has a `<Where>` clause, the filter is combined using `<And>`
+- If no `<Where>` exists, one is injected into the query
+- Tokens are resolved before the CAML query is sent to SharePoint
+- The cache key includes the resolved filter, so different filter values produce separate cache entries
+
+---
+
+## Debug Template
+
+Use the built-in `debug.hbs` template to inspect the raw data available to your templates. It displays:
+
+- **User profile** as JSON
+- **Items** (with count) as JSON
+- **Full template context** as JSON
+- A **Copy All** button for easy clipboard export
+
+Select it from the template dropdown when you aren't seeing expected data in your templates.
+
+---
+
 ## Form Submission
 
 ### Configure Submit Endpoint
@@ -427,6 +473,7 @@ For rapid template development, see the companion project:
 | 1.0.1 | Feb 2025 | Added @mrpullen/fluentui-carousel |
 | 1.1.0 | Feb 2025 | Multiple data sources, HTTP endpoints |
 | 1.2.0 | Feb 2025 | Form submission, multi-auth, survey template |
+| 1.3.0 | Apr 2026 | PageDataService (`{{page.*}}` tokens), CAML filter support with token resolution, `json` Handlebars helper, debug template |
 
 ---
 
