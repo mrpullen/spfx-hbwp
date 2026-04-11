@@ -140,7 +140,7 @@
   <div class="debug-stats-{{wpId}}">
     <div class="debug-stat-{{wpId}}">
       <span class="debug-stat-label-{{wpId}}">Items:</span>
-      <span class="debug-stat-value-{{wpId}}">{{items.length}}</span>
+      <span class="debug-stat-value-{{wpId}}">{{items.rows.length}}</span>
     </div>
     <div class="debug-stat-{{wpId}}">
       <span class="debug-stat-label-{{wpId}}">User:</span>
@@ -160,7 +160,7 @@
 
   {{!-- Primary Items --}}
   <div class="debug-section-{{wpId}}">
-    <h3 class="debug-section-title-{{wpId}}">📋 Items ({{items.length}} total)</h3>
+    <h3 class="debug-section-title-{{wpId}}">📋 Items ({{items.rows.length}} total)</h3>
     <pre class="debug-json-{{wpId}}">{{json items}}</pre>
   </div>
 

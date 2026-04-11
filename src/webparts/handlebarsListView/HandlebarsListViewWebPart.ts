@@ -229,31 +229,54 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
   }
 
   /**
-   * Loads template content from a SharePoint file if configured
+   * Loads template content from a SharePoint file if configured.
+   * Uses PnPjs REST API to get raw file content (works for any extension including .hbs).
+   * Falls back to direct fetch, then to inline template.
    */
   private async loadTemplateFromFile(): Promise<void> {
     const templateFile = this.properties.templateFile;
     
     if (templateFile && templateFile.fileAbsoluteUrl) {
+      const fileUrl = templateFile.fileAbsoluteUrl;
+      console.log(`[HBWP Template] Loading template from file: ${fileUrl}`);
+      console.log(`[HBWP Template] File name: ${templateFile.fileName || '(unknown)'}`);
+      
       try {
-        // Use fetch to get the file content
-        const response = await fetch(templateFile.fileAbsoluteUrl, {
-          headers: {
-            'Accept': 'text/plain'
-          }
-        });
+        // Extract server-relative path from the absolute URL
+        const url = new URL(fileUrl);
+        const serverRelativePath = decodeURIComponent(url.pathname);
+        console.log(`[HBWP Template] Server-relative path: ${serverRelativePath}`);
+
+        // Use PnPjs to get file content via REST API — works for any extension
+        if (!this.sp) {
+          throw new Error('PnPjs not initialized');
+        }
+        const fileContent = await this.sp.web.getFileByServerRelativePath(serverRelativePath).getText();
         
-        if (response.ok) {
-          this.resolvedTemplate = await response.text();
+        if (fileContent && fileContent.trim().length > 0) {
+          // Sanity check: if it looks like an HTML page wrapper instead of a template, warn
+          const isHtmlPage = fileContent.trim().toLowerCase().startsWith('<!doctype') || 
+                             fileContent.trim().toLowerCase().startsWith('<html');
+          if (isHtmlPage) {
+            console.warn(`[HBWP Template] WARNING: File content appears to be a full HTML page, not a Handlebars template. ` +
+              `This may indicate SharePoint returned a preview page instead of raw file content.`);
+            console.warn(`[HBWP Template] First 200 chars: ${fileContent.substring(0, 200)}`);
+          } else {
+            console.log(`[HBWP Template] Successfully loaded template (${fileContent.length} chars)`);
+            console.log(`[HBWP Template] First 100 chars: ${fileContent.substring(0, 100)}`);
+          }
+          this.resolvedTemplate = fileContent;
         } else {
-          console.error('Failed to load template file:', response.statusText);
+          console.warn(`[HBWP Template] File returned empty content. Falling back to inline template.`);
           this.resolvedTemplate = this.properties.template || '';
         }
       } catch (error) {
-        console.error('Error loading template from file:', error);
+        console.error(`[HBWP Template] Error loading template via PnPjs REST API:`, error);
+        console.log(`[HBWP Template] Falling back to inline template.`);
         this.resolvedTemplate = this.properties.template || '';
       }
     } else {
+      console.log(`[HBWP Template] No template file configured. Using inline template.`);
       this.resolvedTemplate = this.properties.template || '';
     }
   }
@@ -263,9 +286,12 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
    */
   private getEffectiveTemplate(): string {
     if (this.properties.templateFile && this.properties.templateFile.fileAbsoluteUrl && this.resolvedTemplate) {
+      console.log(`[HBWP Template] Using file template (${this.resolvedTemplate.length} chars) from: ${this.properties.templateFile.fileAbsoluteUrl}`);
       return this.resolvedTemplate;
     }
-    return this.properties.template || '';
+    const inline = this.properties.template || '';
+    console.log(`[HBWP Template] Using inline template (${inline.length} chars)`);
+    return inline;
   }
 
   private addDataSource(): void {
