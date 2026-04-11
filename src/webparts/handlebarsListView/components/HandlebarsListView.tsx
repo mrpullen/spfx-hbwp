@@ -395,13 +395,16 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     // Get additional data sources (with resolved CAML filters)
     const dataSources = await this.getAdditionalDataSources(filterTokenContext);
 
-    // Build full token context for HTTP endpoints (includes list data)
+    // Build full token context for HTTP endpoints (includes list data rows)
+    const dsRows: Record<string, any> = {};
+    for (const key of Object.keys(dataSources)) {
+      dsRows[key] = dataSources[key].rows;
+    }
     const tokenContext: ITokenContext = {
       items: primaryEnvelope.rows,
       user: this.props.userProfile || {},
       page: this.props.pageData || {},
-      // Provide rows for token resolution in HTTP endpoints
-      ...Object.fromEntries(Object.entries(dataSources).map(([k, v]) => [k, v.rows]))
+      ...dsRows
     };
 
     // Get HTTP endpoint data (can use tokens from list data, user, and page)

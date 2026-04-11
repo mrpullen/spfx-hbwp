@@ -231,12 +231,12 @@
   {{!-- Header --}}
   <div class="announcements-header-{{wpId}}">
     <h2 class="announcements-title-{{wpId}}">📢 Announcements</h2>
-    <fluent-badge appearance="filled" color="brand">{{items.length}} item{{#if (gt items.length 1)}}s{{/if}}</fluent-badge>
+    <fluent-badge appearance="filled" color="brand">{{items.rows.length}} item{{#if (gt items.rows.length 1)}}s{{/if}}</fluent-badge>
   </div>
 
-  {{#if items.length}}
+  {{#if items.rows.length}}
     <div class="announcements-list-{{wpId}}">
-      {{#each items}}
+      {{#each items.rows}}
 
         {{!-- Announcement Card --}}
         <fluent-card class="announcement-card-{{../wpId}}">

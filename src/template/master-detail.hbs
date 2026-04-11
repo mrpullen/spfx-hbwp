@@ -141,14 +141,14 @@
   <div class="master-detail-header-{{wpId}}">
     <h2 class="master-detail-title-{{wpId}}">Categories & Items</h2>
     <div style="display: flex; gap: 8px;">
-      <fluent-badge appearance="filled" color="brand">{{items.length}} categories</fluent-badge>
-      <fluent-badge appearance="outline">{{details.length}} total items</fluent-badge>
+      <fluent-badge appearance="filled" color="brand">{{items.rows.length}} categories</fluent-badge>
+      <fluent-badge appearance="outline">{{details.rows.length}} total items</fluent-badge>
     </div>
   </div>
 
-  {{#if items.length}}
+  {{#if items.rows.length}}
     <div class="master-cards-{{wpId}}">
-      {{#each items}}
+      {{#each items.rows}}
         {{!-- Store the master item's Title for filtering --}}
         {{#with (lookup ../this "Title") as |masterTitle|}}
         {{/with}}
@@ -159,7 +159,7 @@
             <h3 class="master-card-title-{{../wpId}}">{{Title}}</h3>
             {{!-- Count matching details --}}
             <div class="detail-count-{{../wpId}}">
-              {{#each ../details}}
+              {{#each ../details.rows}}
                 {{#eq Category ../Title}}+{{/eq}}
               {{/each}}
               items
@@ -173,7 +173,7 @@
             
             {{!-- Filtered Detail List --}}
             <ul class="detail-list-{{../wpId}}">
-              {{#each ../details}}
+              {{#each ../details.rows}}
                 {{!-- Filter: only show details where Category matches master Title --}}
                 {{#eq Category ../Title}}
                   <li class="detail-item-{{../../wpId}}">
@@ -196,7 +196,7 @@
             </ul>
 
             {{!-- Show empty state if no matching details --}}
-            {{#unless (some ../details "Category" Title)}}
+            {{#unless (some ../details.rows "Category" Title)}}
               <div class="empty-details-{{../wpId}}">
                 No items in this category
               </div>
@@ -226,7 +226,7 @@
             <h4 style="margin: 0 0 12px 0; color: #323130;">Items in this category:</h4>
             
             <div style="display: flex; flex-direction: column; gap: 8px;">
-              {{#each ../details}}
+              {{#each ../details.rows}}
                 {{#eq Category ../Title}}
                   <fluent-card style="padding: 12px;">
                     <div style="display: flex; justify-content: space-between; align-items: start;">
