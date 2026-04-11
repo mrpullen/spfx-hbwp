@@ -6,6 +6,7 @@ import Handlebars from "handlebars";
 import helpers from 'handlebars-helpers'
 import ReactHtmlParser from 'react-html-parser';
 import { ListDataService, IListDataResult, HttpDataService, FormSubmitService, generateFormHandlerScript, generateFormResponseHandlerScript, ITokenContext } from '../services';
+import { scopeCssClasses } from './scopeCssClasses';
 
 /**
  * Resolves {{token}} expressions in a string using a context object.
@@ -345,11 +346,14 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
   private async getHandlebarsTemplate(): Promise<void> {
     const templateData = await this.getAllData();
 
-    const template = Handlebars.compile(this.props.template);
+    // Scope CSS classes in <style> blocks with the web part instance ID
+    const wpId = this.props.instanceId;
+    const scopedTemplate = scopeCssClasses(this.props.template, wpId);
+
+    const template = Handlebars.compile(scopedTemplate);
     const templateContent = template(templateData);
     
     // Inject form handler scripts if submit endpoints are configured
-    const wpId = this.props.instanceId;
     const formScripts = this.props.submitEndpoints && this.props.submitEndpoints.length > 0
       ? generateFormHandlerScript(wpId) + generateFormResponseHandlerScript(wpId)
       : '';

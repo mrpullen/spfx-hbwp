@@ -1,8 +1,11 @@
 {{!-- 
   Idea Cards Template
   ====================
-  Displays ideas as cards with title, description, average star rating,
-  likes count, and author persona with email/chat links.
+  Displays ideas as cards with title, description, likes count,
+  and author persona with email/chat links.
+  
+  CSS classes in <style> blocks are automatically scoped with the
+  web part instance ID — no need to add {{wpId}} manually.
   
   Required view fields: Title, Description, LikesCount, FileRef
   Required expandFields: ["Editor", "LikedBy"]
@@ -11,54 +14,55 @@
   - items: List data with rows from configured view
   - user: Current user profile
   - wpId: Web part instance ID
+  - siteUrl: The configured site URL
 --}}
 
 <style>
-  .idea-container-{{wpId}} {
+  .idea-container {
     font-family: var(--body-font, 'Segoe UI', sans-serif);
     padding: 16px;
   }
 
-  .idea-grid-{{wpId}} {
+  .idea-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 20px;
   }
 
-  .idea-card-{{wpId}} {
+  .idea-card {
     padding: 0;
     overflow: hidden;
     transition: box-shadow 0.2s ease, transform 0.2s ease;
     border-radius: 8px;
   }
 
-  .idea-card-{{wpId}}:hover {
+  .idea-card:hover {
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
     transform: translateY(-2px);
   }
 
-  .idea-card-body-{{wpId}} {
+  .idea-card-body {
     padding: 20px;
   }
 
-  .idea-title-{{wpId}} {
+  .idea-title {
     margin: 0 0 8px 0;
     font-size: 18px;
     font-weight: 600;
     line-height: 1.3;
   }
 
-  .idea-title-{{wpId}} a {
+  .idea-title a {
     color: #323130;
     text-decoration: none;
   }
 
-  .idea-title-{{wpId}} a:hover {
+  .idea-title a:hover {
     color: #0078d4;
     text-decoration: underline;
   }
 
-  .idea-desc-{{wpId}} {
+  .idea-desc {
     margin: 0 0 16px 0;
     font-size: 14px;
     color: #605e5c;
@@ -69,16 +73,16 @@
     overflow: hidden;
   }
 
-  .idea-desc-{{wpId}} a {
+  .idea-desc a {
     color: inherit;
     text-decoration: none;
   }
 
-  .idea-desc-{{wpId}} a:hover {
+  .idea-desc a:hover {
     color: #0078d4;
   }
 
-  .idea-stats-{{wpId}} {
+  .idea-stats {
     display: flex;
     align-items: center;
     gap: 16px;
@@ -87,7 +91,7 @@
     border-bottom: 1px solid #edebe9;
   }
 
-  .idea-likes-{{wpId}} {
+  .idea-likes {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -96,37 +100,37 @@
     text-decoration: none;
   }
 
-  .idea-likes-{{wpId}} .heart {
+  .idea-likes .heart {
     font-size: 18px;
     transition: transform 0.15s ease;
   }
 
-  .idea-likes-{{wpId}} .heart-liked {
+  .idea-likes .heart-liked {
     color: #d13438;
   }
 
-  .idea-likes-{{wpId}} .heart-not-liked {
+  .idea-likes .heart-not-liked {
     color: #c8c6c4;
   }
 
-  .idea-likes-{{wpId}}:hover .heart {
+  .idea-likes:hover .heart {
     transform: scale(1.15);
   }
 
-  .idea-persona-{{wpId}} {
+  .idea-persona {
     display: flex;
     align-items: center;
     gap: 10px;
   }
 
-  .persona-details-{{wpId}} {
+  .persona-details {
     display: flex;
     flex-direction: column;
     gap: 2px;
     min-width: 0;
   }
 
-  .persona-name-{{wpId}} {
+  .persona-name {
     font-size: 13px;
     font-weight: 600;
     color: #323130;
@@ -136,18 +140,18 @@
     text-overflow: ellipsis;
   }
 
-  .persona-name-{{wpId}}:hover {
+  .persona-name:hover {
     color: #0078d4;
     text-decoration: underline;
   }
 
-  .persona-actions-{{wpId}} {
+  .persona-actions {
     display: flex;
     gap: 10px;
     font-size: 12px;
   }
 
-  .persona-actions-{{wpId}} a {
+  .persona-actions a {
     color: #0078d4;
     text-decoration: none;
     display: flex;
@@ -155,39 +159,39 @@
     gap: 3px;
   }
 
-  .persona-actions-{{wpId}} a:hover {
+  .persona-actions a:hover {
     text-decoration: underline;
   }
 
-  .idea-empty-{{wpId}} {
+  .idea-empty {
     text-align: center;
     padding: 60px 20px;
     color: #605e5c;
   }
 </style>
 
-<div class="idea-container-{{wpId}}">
+<div class="idea-container">
   {{#if items.rows.length}}
-    <div class="idea-grid-{{wpId}}">
+    <div class="idea-grid">
       {{#each items.rows}}
-        <fluent-card class="idea-card-{{../wpId}}">
-          <div class="idea-card-body-{{../wpId}}">
+        <fluent-card class="idea-card">
+          <div class="idea-card-body">
 
             {{!-- Title linked to page --}}
-            <h3 class="idea-title-{{../wpId}}">
+            <h3 class="idea-title">
               <a href="{{FileRef}}">{{Title}}</a>
             </h3>
 
             {{!-- Description linked to page --}}
             {{#if Description}}
-              <div class="idea-desc-{{../wpId}}">
+              <div class="idea-desc">
                 <a href="{{FileRef}}">{{Description}}</a>
               </div>
             {{/if}}
 
             {{!-- Likes row --}}
-            <div class="idea-stats-{{../wpId}}">
-              <a href="{{FileRef}}" class="idea-likes-{{../wpId}}">
+            <div class="idea-stats">
+              <a href="{{FileRef}}" class="idea-likes">
                 {{!-- Check if current user liked this item --}}
                 {{#filter LikedBy "Id" ../../user.id}}
                   <span class="heart heart-liked">♥</span>
@@ -201,15 +205,15 @@
             {{!-- Author Persona --}}
             {{#each Editor}}
               {{#if @first}}
-                <div class="idea-persona-{{../../wpId}}">
+                <div class="idea-persona">
                   <fluent-avatar
                     name="{{Title}}"
                     size="36"
                     image="{{../../siteUrl}}/_layouts/15/userphoto.aspx?size=M&amp;username={{Email}}">
                   </fluent-avatar>
-                  <div class="persona-details-{{../../wpId}}">
-                    <a href="mailto:{{Email}}" class="persona-name-{{../../wpId}}">{{Title}}</a>
-                    <div class="persona-actions-{{../../wpId}}">
+                  <div class="persona-details">
+                    <a href="mailto:{{Email}}" class="persona-name">{{Title}}</a>
+                    <div class="persona-actions">
                       <a href="mailto:{{Email}}" title="Send email">✉ Email</a>
                       <a href="sip:{{Sip}}" title="Start chat">💬 Chat</a>
                     </div>
@@ -223,7 +227,7 @@
       {{/each}}
     </div>
   {{else}}
-    <div class="idea-empty-{{../wpId}}">
+    <div class="idea-empty">
       <div style="font-size: 48px; margin-bottom: 12px;">💡</div>
       <p style="font-size: 16px; font-weight: 600;">No ideas yet</p>
       <p>Ideas will appear here once they are created.</p>
