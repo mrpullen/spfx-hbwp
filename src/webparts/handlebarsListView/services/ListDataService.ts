@@ -21,6 +21,9 @@ export interface IListFetchConfig {
    *  Should be the inner CAML (e.g. <Eq><FieldRef Name='Status'/><Value Type='Text'>Active</Value></Eq>).
    *  Tokens like {{user.email}} or {{page.Id}} should already be resolved before passing. */
   camlFilter?: string;
+  /** Optional comma-separated list of fields to expand (e.g. "Author,Editor,AssignedTo").
+   *  Used to retrieve lookup/person field details not included in the view. */
+  expandFields?: string;
 }
 
 /**
@@ -67,8 +70,8 @@ export class ListDataService {
   /**
    * Generates a unique cache key for a list/view/filter combination
    */
-  public getCacheKey(siteUrl: string, listId: string, viewId: string, camlFilter?: string): string {
-    const base = `${siteUrl}_${listId}_${viewId}${camlFilter ? `_${camlFilter}` : ''}`;
+  public getCacheKey(siteUrl: string, listId: string, viewId: string, camlFilter?: string, expandFields?: string): string {
+    const base = `${siteUrl}_${listId}_${viewId}${camlFilter ? `_${camlFilter}` : ''}${expandFields ? `_${expandFields}` : ''}`;
     return `list_${btoa(base).replace(/[=+/]/g, '_')}`;
   }
 
@@ -85,7 +88,7 @@ export class ListDataService {
       return { items: [], fromCache: false, error: new Error('Missing required configuration') };
     }
 
-    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, config.camlFilter);
+    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, config.camlFilter, config.expandFields);
 
     try {
       if (this.cacheEnabled) {
@@ -98,14 +101,14 @@ export class ListDataService {
         // Use getOrFetch which handles mutex locking
         const items = await this.cacheService.getOrFetch(
           cacheKey,
-          async () => this.fetchFromSharePoint(siteUrl, listId, viewId, config.camlFilter),
+          async () => this.fetchFromSharePoint(siteUrl, listId, viewId, config.camlFilter, config.expandFields),
           effectiveTimeout
         );
         
         return { items, fromCache: false };
       } else {
         // Cache disabled, fetch directly
-        const items = await this.fetchFromSharePoint(siteUrl, listId, viewId, config.camlFilter);
+        const items = await this.fetchFromSharePoint(siteUrl, listId, viewId, config.camlFilter, config.expandFields);
         return { items, fromCache: false };
       }
     } catch (error) {
@@ -157,11 +160,11 @@ export class ListDataService {
    */
   public async refreshListData(config: IListFetchConfig): Promise<IListDataResult> {
     const { siteUrl, listId, viewId } = config;
-    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, config.camlFilter);
-    
+    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, config.camlFilter, config.expandFields);
+
     // Remove from cache first
     this.cacheService.remove(cacheKey);
-    
+
     // Fetch fresh data
     return this.getListData(config);
   }
@@ -176,16 +179,16 @@ export class ListDataService {
   /**
    * Clears cached data for a specific list
    */
-  public clearListCache(siteUrl: string, listId: string, viewId: string, camlFilter?: string): void {
-    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, camlFilter);
+  public clearListCache(siteUrl: string, listId: string, viewId: string, camlFilter?: string, expandFields?: string): void {
+    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, camlFilter, expandFields);
     this.cacheService.remove(cacheKey);
   }
 
   /**
    * Checks if data for a list is currently cached
    */
-  public isListCached(siteUrl: string, listId: string, viewId: string, camlFilter?: string): boolean {
-    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, camlFilter);
+  public isListCached(siteUrl: string, listId: string, viewId: string, camlFilter?: string, expandFields?: string): boolean {
+    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, camlFilter, expandFields);
     return this.cacheService.has(cacheKey);
   }
 
@@ -230,7 +233,8 @@ export class ListDataService {
     siteUrl: string,
     listId: string,
     viewId: string,
-    camlFilter?: string
+    camlFilter?: string,
+    expandFields?: string
   ): Promise<Array<any>> {
     try {
       // Create a context for the target site
@@ -251,11 +255,21 @@ export class ListDataService {
         viewXml = this.mergeCamlFilter(viewXml, camlFilter);
       }
       
-      // Determine what to expand based on list type
+      // Determine what to expand based on list type and configured expand fields
       const expands: Array<string> = [];
       if (listInfo.BaseType === 1) {
         // Document library - expand File properties
         expands.push("File");
+      }
+
+      // Add user-configured expand fields (comma-separated internal names)
+      if (expandFields) {
+        const fields = expandFields.split(',').map(f => f.trim()).filter(f => f);
+        for (const field of fields) {
+          if (!expands.includes(field)) {
+            expands.push(field);
+          }
+        }
       }
       
       // Execute the CAML query
@@ -282,6 +296,9 @@ export class ListDataService {
    */
   public setCacheEnabled(enabled: boolean): void {
     this.cacheEnabled = enabled;
+    if (!enabled) {
+      this.clearAllCache();
+    }
   }
 
   /**

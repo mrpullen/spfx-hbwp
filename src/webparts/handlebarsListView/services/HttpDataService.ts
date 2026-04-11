@@ -420,6 +420,9 @@ export class HttpDataService {
    */
   public setCacheEnabled(enabled: boolean): void {
     this.cacheEnabled = enabled;
+    if (!enabled) {
+      this.clearAllCache();
+    }
   }
 
   /**
