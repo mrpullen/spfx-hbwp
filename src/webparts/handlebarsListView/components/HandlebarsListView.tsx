@@ -5,7 +5,7 @@ import Handlebars from "handlebars";
 
 import helpers from 'handlebars-helpers'
 import ReactHtmlParser from 'react-html-parser';
-import { ListDataService, HttpDataService, FormSubmitService, generateFormHandlerScript, generateFormResponseHandlerScript, ITokenContext } from '../services';
+import { ListDataService, IListDataResult, HttpDataService, FormSubmitService, generateFormHandlerScript, generateFormResponseHandlerScript, ITokenContext } from '../services';
 
 /**
  * Resolves {{token}} expressions in a string using a context object.
@@ -33,9 +33,27 @@ interface IHandlebarsListViewState {
   visible: boolean;
 }
 
+/**
+ * Envelope wrapping list data rows with paging metadata.
+ * Used for primary items and every additional data source.
+ */
+interface IDataEnvelope {
+  rows: Array<any>;
+  paging: {
+    hasNext: boolean;
+    hasPrev: boolean;
+    nextHref?: string;
+    prevHref?: string;
+    firstRow?: number;
+    lastRow?: number;
+    rowLimit?: number;
+  };
+}
+
 interface ITemplateData {
-  items: Array<any>;
+  items: IDataEnvelope;
   user: any;
+  page: any;
   /** Additional data sources are spread at root level by their key */
   [key: string]: any;
 }
@@ -343,6 +361,24 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
   }
 
   /**
+   * Builds an IDataEnvelope from an IListDataResult.
+   */
+  private static toEnvelope(result: IListDataResult): IDataEnvelope {
+    return {
+      rows: result.items,
+      paging: {
+        hasNext: !!result.nextHref,
+        hasPrev: !!result.prevHref,
+        nextHref: result.nextHref,
+        prevHref: result.prevHref,
+        firstRow: result.firstRow,
+        lastRow: result.lastRow,
+        rowLimit: result.rowLimit
+      }
+    };
+  }
+
+  /**
    * Loads all data including primary list, additional data sources, HTTP endpoints, and user profile
    */
   private async getAllData(): Promise<ITemplateData> {
@@ -353,26 +389,28 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     };
 
     // Get primary list data (with resolved CAML filter)
-    const primaryItems = await this.getPrimaryListData(filterTokenContext);
+    const primaryResult = await this.getPrimaryListData(filterTokenContext);
+    const primaryEnvelope = HandlebarsListView.toEnvelope(primaryResult);
 
     // Get additional data sources (with resolved CAML filters)
     const dataSources = await this.getAdditionalDataSources(filterTokenContext);
 
     // Build full token context for HTTP endpoints (includes list data)
     const tokenContext: ITokenContext = {
-      items: primaryItems,
+      items: primaryEnvelope.rows,
       user: this.props.userProfile || {},
       page: this.props.pageData || {},
-      ...dataSources
+      // Provide rows for token resolution in HTTP endpoints
+      ...Object.fromEntries(Object.entries(dataSources).map(([k, v]) => [k, v.rows]))
     };
 
     // Get HTTP endpoint data (can use tokens from list data, user, and page)
     const httpData = await this.getHttpEndpointData(tokenContext);
 
     // Build template data object with data sources spread at root level
-    // This allows referencing as {{announcements}} instead of {{dataSources.announcements}}
+    // Each list data source is an envelope: { rows: [...], paging: {...} }
     const templateData: ITemplateData = {
-      items: primaryItems,
+      items: primaryEnvelope,
       user: ListDataService.normalizeData(this.props.userProfile || {}),
       page: ListDataService.normalizeData(this.props.pageData || {}),
       // Include instanceId for unique DOM element IDs when multiple web parts are on a page
@@ -388,32 +426,30 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
   /**
    * Gets primary list data using the ListDataService
    */
-  private async getPrimaryListData(tokenContext: ITokenContext): Promise<Array<any>> {
+  private async getPrimaryListData(tokenContext: ITokenContext): Promise<IListDataResult> {
     const { site, list, view, viewXml, camlFilter } = this.props;
 
     if (!this.listDataService || !site?.url || !list || !view) {
-      return [];
+      return { items: [], fromCache: false };
     }
 
     const resolvedFilter = camlFilter ? resolveTokens(camlFilter, tokenContext) : undefined;
 
-    const result = await this.listDataService.getListData({
+    return this.listDataService.getListData({
       siteUrl: site.url,
       listId: list,
       viewId: view,
       viewXml: viewXml || undefined,
       camlFilter: resolvedFilter
     });
-
-    return result.items;
   }
 
   /**
-   * Gets all additional data sources using the ListDataService
+   * Gets all additional data sources using the ListDataService, wrapped in envelopes
    */
-  private async getAdditionalDataSources(tokenContext: ITokenContext): Promise<Record<string, Array<any>>> {
+  private async getAdditionalDataSources(tokenContext: ITokenContext): Promise<Record<string, IDataEnvelope>> {
     const { dataSources } = this.props;
-    const result: Record<string, Array<any>> = {};
+    const result: Record<string, IDataEnvelope> = {};
 
     if (!this.listDataService || !dataSources || dataSources.length === 0) {
       return result;
@@ -441,7 +477,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     const fetchResults = await this.listDataService.getMultipleListData(configs);
     
     for (const key of Object.keys(fetchResults)) {
-      result[key] = fetchResults[key].items;
+      result[key] = HandlebarsListView.toEnvelope(fetchResults[key]);
     }
 
     return result;

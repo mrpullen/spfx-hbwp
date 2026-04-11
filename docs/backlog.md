@@ -2,34 +2,57 @@
 
 ## Paging Control
 
-This paging will only work on the items data - as it will be primary. it should integrate with the viewxml and the returned data if used - data returned will hopefully provide next / previous pointer information.
+Paging applies to primary list items only. Now that we use `renderListDataAsStream`, paging metadata (`NextHref`, `FirstRow`, `LastRow`, `RowLimit`) is returned natively — no workarounds needed.
 
-- [ ] Build `hbwp-paging` Handlebars helper/block that integrates with paged list results
-- [ ] Support configurable page size
-- [ ] Render next/previous/page number navigation
-- [ ] Maintain paging state across re-renders
+- [ ] Accept `Paging` parameter in `fetchFromSharePoint` to request a specific page
+- [ ] Add `prevHref` to `IListDataResult` (SharePoint returns it, PnPjs type just doesn't declare it)
+- [ ] Expose paging state in template context (`{{paging.hasNext}}`, `{{paging.hasPrev}}`, `{{paging.firstRow}}`, `{{paging.lastRow}}`, `{{paging.rowLimit}}`)
+- [ ] Build `hbwp-paging` Handlebars block helper to render prev/next navigation
+- [ ] Wire click events (`data-hbwp-page="next"` / `data-hbwp-page="prev"`) through event delegation to trigger re-fetch
+- [ ] Maintain paging state in component state across re-renders
 
-### Implementation Notes
+### What's Already Done
 
-**Current limitation:** `getItemsByCAMLQuery` in PnPjs returns a flat array — it does **not** expose `ListItemCollectionPositionNext` paging metadata.
+- [x] `renderListDataAsStream` is the data fetch method (replaces `getItemsByCAMLQuery`)
+- [x] `IListDataResult` already includes `nextHref`, `firstRow`, `lastRow`, `rowLimit`
+- [x] `RowLimit` in the ViewXml is respected automatically (comes from the stored view)
+- [x] `IRenderListDataParameters` has a `Paging` property for passing paging tokens
 
-**Required approach — use SharePoint REST directly:**
-```
-POST /_api/web/lists('{listId}')/GetItems
-Body: { query: { ViewXml: '...', ListItemCollectionPositionNext: '...' } }
-```
+### Implementation Tasks
 
-The REST response includes:
-- `d.results` — the page of items
-- `d.ListItemCollectionPositionNext` — a token string (e.g., `Paged=TRUE&p_ID=100`) to pass for the next page
+**Files to modify:**
+- `ListDataService.ts` — accept `paging` token in `IListFetchConfig` and pass to `renderListDataAsStream`
+- `HandlebarsListView.tsx` — paging state, template context, event delegation, re-fetch
+- `IHandlebarsListViewProps.ts` — no changes needed (paging is component state, not props)
 
-**Steps to implement:**
-1. Replace `getItemsByCAMLQuery` with direct REST call via PnPjs `spHttpClient` or `SPHttpClient`
-2. Ensure `<RowLimit Paged="TRUE">N</RowLimit>` is in the ViewXml (injected or from the stored view)
-3. Return both items and position token from `fetchFromSharePoint` (update `IListDataResult`)
-4. Store position token in component state for forward/back navigation
-5. `hbwp-paging` helper renders prev/next controls that trigger re-fetch with the stored position token
-6. Consider exposing `{{paging.hasNext}}`, `{{paging.hasPrev}}`, `{{paging.currentPage}}` in template context
+**Tasks:**
+1. **Add `paging` to `IListFetchConfig`** — Optional `paging?: string` field. Pass it as the `Paging` property on `renderListDataAsStream({ ..., Paging: config.paging })`. This is the `NextHref`/`PrevHref` token string.
+2. **Capture `PrevHref`** — The REST response includes `PrevHref` but the PnPjs `IRenderListDataAsStreamResult` type doesn't declare it. Cast `response` as `any` to access `response.PrevHref`, or extend the interface. Add `prevHref?: string` to `IListDataResult`.
+3. **Paging state in component** — Add to component state: `{ pagingToken?: string, prevToken?: string, pageHistory: string[] }`. On next/prev click, update the paging token and re-fetch.
+4. **Template context** — After `getPrimaryListData`, spread paging info into the template data:
+   ```typescript
+   paging: {
+     hasNext: !!result.nextHref,
+     hasPrev: !!result.prevHref || pageHistory.length > 0,
+     firstRow: result.firstRow,
+     lastRow: result.lastRow,
+     rowLimit: result.rowLimit
+   }
+   ```
+5. **`hbwp-paging` helper** — Block helper that renders navigation controls:
+   ```handlebars
+   {{#hbwp-paging}}
+     {{#if paging.hasPrev}}<button data-hbwp-page="prev">← Previous</button>{{/if}}
+     <span>Showing {{paging.firstRow}}–{{paging.lastRow}}</span>
+     {{#if paging.hasNext}}<button data-hbwp-page="next">Next →</button>{{/if}}
+   {{/hbwp-paging}}
+   ```
+   Or simpler: just use `{{#if paging.hasNext}}` directly in templates — the helper may not be needed if paging data is in the template context.
+6. **Event delegation** — In the container click handler, detect `data-hbwp-page="next"` / `data-hbwp-page="prev"` clicks. On next, store current paging token in `pageHistory`, set `pagingToken = result.nextHref`, re-fetch. On prev, pop from `pageHistory`.
+7. **Cache key** — Include paging token in the cache key so different pages are cached independently.
+8. **RowLimit enforcement** — If the stored ViewXml doesn't have `<RowLimit>`, consider injecting `<RowLimit Paged="TRUE">N</RowLimit>` via a configurable page size property. Otherwise, the view's RowLimit is used as-is.
+
+**Estimated complexity:** Medium — the hard part (getting paging tokens from SharePoint) is already solved. Remaining work is state management and event wiring.
 
 ## Template Lookup Helpers (Client-Side Joins)
 
