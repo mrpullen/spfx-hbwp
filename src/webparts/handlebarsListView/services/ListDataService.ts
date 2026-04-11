@@ -17,13 +17,15 @@ export interface IListFetchConfig {
   listId: string;
   /** View GUID */
   viewId: string;
-  /** Optional CAML filter to merge with the view's Where clause.
+  /** Pre-fetched ViewXml (without Where clause). If provided, skips runtime view fetch. */
+  viewXml?: string;
+  /** Optional CAML Where clause to inject into the viewXml.
    *  Should be the inner CAML (e.g. <Eq><FieldRef Name='Status'/><Value Type='Text'>Active</Value></Eq>).
    *  Tokens like {{user.email}} or {{page.Id}} should already be resolved before passing. */
   camlFilter?: string;
-  /** Optional comma-separated list of fields to expand (e.g. "Author,Editor,AssignedTo").
+  /** Optional fields to expand (array from multi-select picker or comma-separated string).
    *  Used to retrieve lookup/person field details not included in the view. */
-  expandFields?: string;
+  expandFields?: string | string[];
 }
 
 /**
@@ -70,8 +72,9 @@ export class ListDataService {
   /**
    * Generates a unique cache key for a list/view/filter combination
    */
-  public getCacheKey(siteUrl: string, listId: string, viewId: string, camlFilter?: string, expandFields?: string): string {
-    const base = `${siteUrl}_${listId}_${viewId}${camlFilter ? `_${camlFilter}` : ''}${expandFields ? `_${expandFields}` : ''}`;
+  public getCacheKey(siteUrl: string, listId: string, viewId: string, camlFilter?: string, expandFields?: string | string[]): string {
+    const expandKey = Array.isArray(expandFields) ? expandFields.join(',') : expandFields;
+    const base = `${siteUrl}_${listId}_${viewId}${camlFilter ? `_${camlFilter}` : ''}${expandKey ? `_${expandKey}` : ''}`;
     return `list_${btoa(base).replace(/[=+/]/g, '_')}`;
   }
 
@@ -101,14 +104,14 @@ export class ListDataService {
         // Use getOrFetch which handles mutex locking
         const items = await this.cacheService.getOrFetch(
           cacheKey,
-          async () => this.fetchFromSharePoint(siteUrl, listId, viewId, config.camlFilter, config.expandFields),
+          async () => this.fetchFromSharePoint(siteUrl, listId, viewId, config.camlFilter, config.expandFields, config.viewXml),
           effectiveTimeout
         );
         
         return { items, fromCache: false };
       } else {
         // Cache disabled, fetch directly
-        const items = await this.fetchFromSharePoint(siteUrl, listId, viewId, config.camlFilter, config.expandFields);
+        const items = await this.fetchFromSharePoint(siteUrl, listId, viewId, config.camlFilter, config.expandFields, config.viewXml);
         return { items, fromCache: false };
       }
     } catch (error) {
@@ -179,7 +182,7 @@ export class ListDataService {
   /**
    * Clears cached data for a specific list
    */
-  public clearListCache(siteUrl: string, listId: string, viewId: string, camlFilter?: string, expandFields?: string): void {
+  public clearListCache(siteUrl: string, listId: string, viewId: string, camlFilter?: string, expandFields?: string | string[]): void {
     const cacheKey = this.getCacheKey(siteUrl, listId, viewId, camlFilter, expandFields);
     this.cacheService.remove(cacheKey);
   }
@@ -187,7 +190,7 @@ export class ListDataService {
   /**
    * Checks if data for a list is currently cached
    */
-  public isListCached(siteUrl: string, listId: string, viewId: string, camlFilter?: string, expandFields?: string): boolean {
+  public isListCached(siteUrl: string, listId: string, viewId: string, camlFilter?: string, expandFields?: string | string[]): boolean {
     const cacheKey = this.getCacheKey(siteUrl, listId, viewId, camlFilter, expandFields);
     return this.cacheService.has(cacheKey);
   }
@@ -234,7 +237,8 @@ export class ListDataService {
     listId: string,
     viewId: string,
     camlFilter?: string,
-    expandFields?: string
+    expandFields?: string | string[],
+    storedViewXml?: string
   ): Promise<Array<any>> {
     try {
       // Create a context for the target site
@@ -246,11 +250,16 @@ export class ListDataService {
       // Get list info to determine if it's a document library
       const listInfo = await list();
       
-      // Get the view's CAML query
-      const view = await list.views.getById(viewId).select('ListViewXml')();
+      // Use stored ViewXml if available, otherwise fetch at runtime
+      let viewXml: string;
+      if (storedViewXml) {
+        viewXml = storedViewXml;
+      } else {
+        const view = await list.views.getById(viewId).select('ListViewXml')();
+        viewXml = view.ListViewXml;
+      }
       
-      // Merge additional CAML filter if provided
-      let viewXml = view.ListViewXml;
+      // Inject CAML filter if provided
       if (camlFilter) {
         viewXml = this.mergeCamlFilter(viewXml, camlFilter);
       }
@@ -262,9 +271,11 @@ export class ListDataService {
         expands.push("File");
       }
 
-      // Add user-configured expand fields (comma-separated internal names)
+      // Add user-configured expand fields (array or comma-separated string)
       if (expandFields) {
-        const fields = expandFields.split(',').map(f => f.trim()).filter(f => f);
+        const fields = Array.isArray(expandFields)
+          ? expandFields.map(f => f.trim()).filter(f => f)
+          : expandFields.split(',').map(f => f.trim()).filter(f => f);
         for (const field of fields) {
           if (!expands.includes(field)) {
             expands.push(field);
