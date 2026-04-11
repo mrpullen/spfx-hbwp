@@ -1,0 +1,232 @@
+{{!-- 
+  Idea Cards Template
+  ====================
+  Displays ideas as cards with title, description, average star rating,
+  likes count, and author persona with email/chat links.
+  
+  Required view fields: Title, Description, LikesCount, FileRef
+  Required expandFields: ["Editor", "LikedBy"]
+  
+  Available Data:
+  - items: List data with rows from configured view
+  - user: Current user profile
+  - wpId: Web part instance ID
+--}}
+
+<style>
+  .idea-container-{{wpId}} {
+    font-family: var(--body-font, 'Segoe UI', sans-serif);
+    padding: 16px;
+  }
+
+  .idea-grid-{{wpId}} {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+  }
+
+  .idea-card-{{wpId}} {
+    padding: 0;
+    overflow: hidden;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    border-radius: 8px;
+  }
+
+  .idea-card-{{wpId}}:hover {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
+  }
+
+  .idea-card-body-{{wpId}} {
+    padding: 20px;
+  }
+
+  .idea-title-{{wpId}} {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .idea-title-{{wpId}} a {
+    color: #323130;
+    text-decoration: none;
+  }
+
+  .idea-title-{{wpId}} a:hover {
+    color: #0078d4;
+    text-decoration: underline;
+  }
+
+  .idea-desc-{{wpId}} {
+    margin: 0 0 16px 0;
+    font-size: 14px;
+    color: #605e5c;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .idea-desc-{{wpId}} a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .idea-desc-{{wpId}} a:hover {
+    color: #0078d4;
+  }
+
+  .idea-stats-{{wpId}} {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #edebe9;
+  }
+
+  .idea-likes-{{wpId}} {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    color: #605e5c;
+    text-decoration: none;
+  }
+
+  .idea-likes-{{wpId}} .heart {
+    font-size: 18px;
+    transition: transform 0.15s ease;
+  }
+
+  .idea-likes-{{wpId}} .heart-liked {
+    color: #d13438;
+  }
+
+  .idea-likes-{{wpId}} .heart-not-liked {
+    color: #c8c6c4;
+  }
+
+  .idea-likes-{{wpId}}:hover .heart {
+    transform: scale(1.15);
+  }
+
+  .idea-persona-{{wpId}} {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .persona-details-{{wpId}} {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .persona-name-{{wpId}} {
+    font-size: 13px;
+    font-weight: 600;
+    color: #323130;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .persona-name-{{wpId}}:hover {
+    color: #0078d4;
+    text-decoration: underline;
+  }
+
+  .persona-actions-{{wpId}} {
+    display: flex;
+    gap: 10px;
+    font-size: 12px;
+  }
+
+  .persona-actions-{{wpId}} a {
+    color: #0078d4;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .persona-actions-{{wpId}} a:hover {
+    text-decoration: underline;
+  }
+
+  .idea-empty-{{wpId}} {
+    text-align: center;
+    padding: 60px 20px;
+    color: #605e5c;
+  }
+</style>
+
+<div class="idea-container-{{wpId}}">
+  {{#if items.rows.length}}
+    <div class="idea-grid-{{wpId}}">
+      {{#each items.rows}}
+        <fluent-card class="idea-card-{{../wpId}}">
+          <div class="idea-card-body-{{../wpId}}">
+
+            {{!-- Title linked to page --}}
+            <h3 class="idea-title-{{../wpId}}">
+              <a href="{{FileRef}}">{{Title}}</a>
+            </h3>
+
+            {{!-- Description linked to page --}}
+            {{#if Description}}
+              <div class="idea-desc-{{../wpId}}">
+                <a href="{{FileRef}}">{{Description}}</a>
+              </div>
+            {{/if}}
+
+            {{!-- Likes row --}}
+            <div class="idea-stats-{{../wpId}}">
+              <a href="{{FileRef}}" class="idea-likes-{{../wpId}}">
+                {{!-- Check if current user liked this item --}}
+                {{#filter LikedBy "Id" ../../user.id}}
+                  <span class="heart heart-liked">♥</span>
+                {{else}}
+                  <span class="heart heart-not-liked">♡</span>
+                {{/filter}}
+                <span>{{LikesCount}} {{#is LikesCount "1"}}like{{else}}likes{{/is}}</span>
+              </a>
+            </div>
+
+            {{!-- Author Persona --}}
+            {{#each Editor}}
+              {{#if @first}}
+                <div class="idea-persona-{{../../wpId}}">
+                  <fluent-avatar
+                    name="{{Title}}"
+                    size="36"
+                    image="{{../../siteUrl}}/_layouts/15/userphoto.aspx?size=M&amp;username={{Email}}">
+                  </fluent-avatar>
+                  <div class="persona-details-{{../../wpId}}">
+                    <a href="mailto:{{Email}}" class="persona-name-{{../../wpId}}">{{Title}}</a>
+                    <div class="persona-actions-{{../../wpId}}">
+                      <a href="mailto:{{Email}}" title="Send email">✉ Email</a>
+                      <a href="sip:{{Sip}}" title="Start chat">💬 Chat</a>
+                    </div>
+                  </div>
+                </div>
+              {{/if}}
+            {{/each}}
+
+          </div>
+        </fluent-card>
+      {{/each}}
+    </div>
+  {{else}}
+    <div class="idea-empty-{{../wpId}}">
+      <div style="font-size: 48px; margin-bottom: 12px;">💡</div>
+      <p style="font-size: 16px; font-weight: 600;">No ideas yet</p>
+      <p>Ideas will appear here once they are created.</p>
+    </div>
+  {{/if}}
+</div>

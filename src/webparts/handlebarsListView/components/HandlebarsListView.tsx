@@ -419,6 +419,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       // Include instanceId for unique DOM element IDs when multiple web parts are on a page
       wpId: this.props.instanceId,
       instanceId: this.props.instanceId,
+      siteUrl: this.props.site?.url || '',
       ...dataSources,
       ...httpData
     };
