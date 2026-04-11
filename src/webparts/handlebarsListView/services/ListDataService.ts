@@ -38,6 +38,8 @@ export interface IListDataResult {
   error?: Error;
   /** Paging token for next page (from renderListDataAsStream NextHref) */
   nextHref?: string;
+  /** Paging token for previous page (from renderListDataAsStream PrevHref) */
+  prevHref?: string;
   /** First row index in the current page */
   firstRow?: number;
   /** Last row index in the current page */
@@ -275,6 +277,7 @@ export class ListDataService {
         items,
         fromCache: false,
         nextHref: response.NextHref,
+        prevHref: (response as any).PrevHref,
         firstRow: response.FirstRow,
         lastRow: response.LastRow,
         rowLimit: response.RowLimit
