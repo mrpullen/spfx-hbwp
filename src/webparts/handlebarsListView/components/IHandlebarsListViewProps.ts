@@ -20,8 +20,6 @@ export interface IListDataSource {
   /** Optional CAML Where clause to inject into the viewXml.
    *  Supports tokens like {{user.email}} or {{page.Id}} */
   camlFilter?: string;
-  /** Optional comma-separated list of fields to expand (e.g. "Author,Editor,AssignedTo") */
-  expandFields?: string;
   /** Cache timeout in minutes for this specific data source (overrides global) */
   cacheTimeoutMinutes?: number;
 }
@@ -148,8 +146,6 @@ export interface IHandlebarsListViewProps {
   viewXml?: string;
   /** CAML filter for the primary list (supports tokens like {{user.email}}, {{page.Id}}) */
   camlFilter?: string;
-  /** Comma-separated list of fields to expand for the primary list (e.g. "Author,Editor") */
-  expandFields?: string;
   /** Multiple list data sources */
   dataSources: IListDataSource[];
   /** HTTP endpoint data sources */

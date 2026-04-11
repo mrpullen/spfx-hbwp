@@ -21,7 +21,7 @@ import HandlebarsListView from './components/HandlebarsListView';
 import { IListDataSource, IHttpEndpointDataSource, IQueryParameter, ISubmitEndpoint, HttpAuthType, SubmitEndpointType } from './components/IHandlebarsListViewProps';
 import { PropertyFieldSitePicker, PropertyFieldListPicker, PropertyFieldListPickerOrderBy, IPropertyFieldSite } from '@pnp/spfx-property-controls';
 import { PropertyFieldViewPicker, PropertyFieldViewPickerOrderBy } from '@pnp/spfx-property-controls/lib/PropertyFieldViewPicker';
-import { PropertyFieldColumnPicker, PropertyFieldColumnPickerOrderBy, IColumnReturnProperty, IPropertyFieldRenderOption } from '@pnp/spfx-property-controls/lib/PropertyFieldColumnPicker';
+
 import { PropertyFieldCodeEditor, PropertyFieldCodeEditorLanguages } from '@pnp/spfx-property-controls/lib/PropertyFieldCodeEditor';
 import { PropertyFieldFilePicker, IFilePickerResult } from '@pnp/spfx-property-controls/lib/PropertyFieldFilePicker';
 import { spfi, SPFI, SPFx } from '@pnp/sp';
@@ -283,7 +283,6 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
       delete this.properties[`ds${index}View`];
       delete this.properties[`ds${index}ViewXml`];
       delete this.properties[`ds${index}CamlFilter`];
-      delete this.properties[`ds${index}ExpandFields`];
       this.properties.dataSourceCount--;
       this.context.propertyPane.refresh();
       this.render();
@@ -409,7 +408,6 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
       const viewId = this.properties[`ds${i}View`] as string;
       const cacheTimeoutMinutes = this.properties[`ds${i}CacheTimeout`] as number;
       const camlFilter = this.properties[`ds${i}CamlFilter`] as string;
-      const expandFields = this.properties[`ds${i}ExpandFields`] as string;
       const viewXml = this.properties[`ds${i}ViewXml`] as string;
       
       if (key && sites && sites.length > 0 && listId && viewId) {
@@ -420,7 +418,6 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
           viewId,
           viewXml: viewXml || undefined,
           camlFilter: camlFilter || undefined,
-          expandFields: expandFields || undefined,
           cacheTimeoutMinutes
         });
       }
@@ -448,7 +445,6 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
         view: this.properties.view,
         viewXml: this.properties.viewXml,
         camlFilter: this.properties.camlFilter,
-        expandFields: this.properties.expandFields,
         dataSources: dataSources,
         httpEndpoints: httpEndpoints,
         submitEndpoints: submitEndpoints,
@@ -607,24 +603,6 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
                 }),
                 PropertyPaneLabel('camlValidationResult', {
                   text: this.camlValidationResult || ''
-                }),
-                PropertyFieldColumnPicker('expandFields', {
-                  label: 'Expand Lookup Fields',
-                  context: this.context as any,
-                  selectedColumn: this.properties.expandFields,
-                  listId: this.properties.list,
-                  webAbsoluteUrl: this.properties?.sites?.[0]?.url,
-                  disabled: !this.properties.list,
-                  orderBy: PropertyFieldColumnPickerOrderBy.Title,
-                  onPropertyChange: this.onPropertyPaneFieldChanged.bind(this),
-                  properties: this.properties,
-                  deferredValidationTime: 0,
-                  key: 'expandFieldsPickerId',
-                  displayHiddenColumns: false,
-                  columnReturnProperty: IColumnReturnProperty["Internal Name"],
-                  multiSelect: true,
-                  renderFieldAs: IPropertyFieldRenderOption["Multiselect Dropdown"],
-                  filter: "TypeAsString eq 'Lookup' or TypeAsString eq 'LookupMulti' or TypeAsString eq 'User' or TypeAsString eq 'UserMulti'"
                 })
               ]
             }, 
@@ -898,24 +876,6 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
             },
             disabled: !listId
           }),
-          PropertyFieldColumnPicker(`ds${i}ExpandFields`, {
-            label: 'Expand Lookup Fields',
-            context: this.context as any,
-            selectedColumn: this.properties[`ds${i}ExpandFields`],
-            listId: listId,
-            webAbsoluteUrl: siteUrl,
-            disabled: !listId,
-            orderBy: PropertyFieldColumnPickerOrderBy.Title,
-            onPropertyChange: this.onPropertyPaneFieldChanged.bind(this),
-            properties: this.properties,
-            deferredValidationTime: 0,
-            key: `ds${i}ExpandFieldsPickerId`,
-            displayHiddenColumns: false,
-            columnReturnProperty: IColumnReturnProperty["Internal Name"],
-            multiSelect: true,
-            renderFieldAs: IPropertyFieldRenderOption["Multiselect Dropdown"],
-            filter: "TypeAsString eq 'Lookup' or TypeAsString eq 'LookupMulti' or TypeAsString eq 'User' or TypeAsString eq 'UserMulti'"
-          })
         ]
       });
     }
