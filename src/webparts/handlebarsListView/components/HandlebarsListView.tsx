@@ -384,7 +384,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
    * Gets primary list data using the ListDataService
    */
   private async getPrimaryListData(tokenContext: ITokenContext): Promise<Array<any>> {
-    const { site, list, view, camlFilter } = this.props;
+    const { site, list, view, camlFilter, expandFields } = this.props;
 
     if (!this.listDataService || !site?.url || !list || !view) {
       return [];
@@ -396,7 +396,8 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       siteUrl: site.url,
       listId: list,
       viewId: view,
-      camlFilter: resolvedFilter
+      camlFilter: resolvedFilter,
+      expandFields: expandFields || undefined
     });
 
     return result.items;
@@ -425,7 +426,8 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
           siteUrl: (ds.site?.url || ds.siteUrl) as string,
           listId: ds.listId,
           viewId: ds.viewId,
-          camlFilter: ds.camlFilter ? resolveTokens(ds.camlFilter, tokenContext) : undefined
+          camlFilter: ds.camlFilter ? resolveTokens(ds.camlFilter, tokenContext) : undefined,
+          expandFields: ds.expandFields || undefined
         },
         timeoutMinutes: ds.cacheTimeoutMinutes
       }));
