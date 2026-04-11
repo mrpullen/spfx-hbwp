@@ -42,6 +42,11 @@ interface ITemplateData {
 
 helpers({ handlebars: Handlebars });
 
+// Override json helper with pretty-printed output
+Handlebars.registerHelper('json', function(context: unknown) {
+  return JSON.stringify(context, null, 2);
+});
+
 // Register custom form helpers
 /* eslint-disable dot-notation */
 Handlebars.registerHelper('hbwp-form', function(this: any, options: Handlebars.HelperOptions) {
@@ -384,7 +389,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
    * Gets primary list data using the ListDataService
    */
   private async getPrimaryListData(tokenContext: ITokenContext): Promise<Array<any>> {
-    const { site, list, view, camlFilter, expandFields } = this.props;
+    const { site, list, view, viewXml, camlFilter, expandFields } = this.props;
 
     if (!this.listDataService || !site?.url || !list || !view) {
       return [];
@@ -396,6 +401,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       siteUrl: site.url,
       listId: list,
       viewId: view,
+      viewXml: viewXml || undefined,
       camlFilter: resolvedFilter,
       expandFields: expandFields || undefined
     });
@@ -426,6 +432,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
           siteUrl: (ds.site?.url || ds.siteUrl) as string,
           listId: ds.listId,
           viewId: ds.viewId,
+          viewXml: ds.viewXml || undefined,
           camlFilter: ds.camlFilter ? resolveTokens(ds.camlFilter, tokenContext) : undefined,
           expandFields: ds.expandFields || undefined
         },

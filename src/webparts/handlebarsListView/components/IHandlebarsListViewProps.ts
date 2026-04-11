@@ -15,7 +15,9 @@ export interface IListDataSource {
   listId: string;
   /** The view GUID */
   viewId: string;
-  /** Optional CAML filter to merge with the view's Where clause.
+  /** Pre-fetched ViewXml (without Where clause). Populated when view is selected. */
+  viewXml?: string;
+  /** Optional CAML Where clause to inject into the viewXml.
    *  Supports tokens like {{user.email}} or {{page.Id}} */
   camlFilter?: string;
   /** Optional comma-separated list of fields to expand (e.g. "Author,Editor,AssignedTo") */
@@ -142,6 +144,8 @@ export interface IHandlebarsListViewProps {
   site?: IPropertyFieldSite;
   list?: string;
   view?: string;
+  /** Pre-fetched ViewXml for the primary list (without Where clause) */
+  viewXml?: string;
   /** CAML filter for the primary list (supports tokens like {{user.email}}, {{page.Id}}) */
   camlFilter?: string;
   /** Comma-separated list of fields to expand for the primary list (e.g. "Author,Editor") */
