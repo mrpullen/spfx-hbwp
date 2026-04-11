@@ -31,6 +31,42 @@ The REST response includes:
 5. `hbwp-paging` helper renders prev/next controls that trigger re-fetch with the stored position token
 6. Consider exposing `{{paging.hasNext}}`, `{{paging.hasPrev}}`, `{{paging.currentPage}}` in template context
 
+## Template Lookup Helpers (Client-Side Joins)
+
+Cross-list lookup joining via Handlebars helpers. Enables multi-level lookup traversal that SharePoint doesn't support natively (e.g., Pages → Ideas → Categories).
+
+- [ ] Register `findItem` helper — find a single item from a data source by key match
+- [ ] Register `findItems` helper — find all matching items (one-to-many)
+- [ ] Support nested usage for multi-hop lookups (Page → Idea → Category)
+
+### Implementation Tasks
+
+**Files to modify:**
+- `HandlebarsListView.tsx` — register new Handlebars helpers with access to all data source collections
+
+**Tasks:**
+1. **`findItem` helper** — `{{#with (findItem ideas "ID" this.IdeaId)}}...{{/with}}` — searches a named data source array for the first item where `item[key] === value`. Returns the matched object (usable with `{{#with}}`)
+2. **`findItems` helper** — `{{#each (findItems comments "IdeaId" this.ID)}}...{{/each}}` — returns all matching items (usable with `{{#each}}`)
+3. **Data source access** — Helpers need access to the full template context root (where data sources live by key). Use `options.data.root` inside the helper to access named data sources
+4. **Type coercion** — Lookup ID values may come back as string or number depending on the API. Compare with `String(item[key]) === String(value)` for safety
+5. **Null safety** — Return `undefined` / empty array if the data source doesn't exist or no match is found, so templates degrade gracefully
+6. **Example usage** — Three-level join in a template:
+   ```handlebars
+   {{#each items}}
+     <h3>{{this.Title}}</h3>
+     {{#with (findItem ../ideas "ID" this.IdeaLookupId)}}
+       <p>Idea: {{this.Title}}</p>
+       {{#with (findItem ../../categories "ID" this.CategoryLookupId)}}
+         <p>Category: {{this.Title}}</p>
+       {{/with}}
+     {{/with}}
+   {{/each}}
+   ```
+
+**Estimated complexity:** Low — two helper registrations, purely template-side logic
+
+---
+
 ## Query Parameter Token Support
 
 We want to be able to link to query / parameter name 
@@ -112,3 +148,116 @@ We will definitely need to be able to modify the data returned - we should cache
 8. **Error handling** — Show a user-friendly message if dynamic filtering produces invalid CAML (e.g., empty `{{query.id}}` token). Consider a fallback: if a required token is empty, show "No filter applied" rather than erroring
 
 **Estimated complexity:** Medium — most infrastructure exists; main work is debouncing, smart cache keys, and change detection wiring
+
+---
+
+## Social Integration (Likes, Ratings & Comments)
+
+Enable templates to show and interact with SharePoint social features — likes/ratings and comments — on list items. Operates in two modes depending on list rating settings.
+
+- [ ] Create `SocialDataService` to fetch and post likes, ratings, and comment counts
+- [ ] Support **Likes mode** — show like count, current user liked state, toggle like
+- [ ] Support **Ratings mode** — show average rating, current user's rating, submit rating
+- [ ] Fetch comment counts per item
+- [ ] Register Handlebars helpers for template access
+- [ ] Add template event delegation for like/rate/comment actions
+
+### Implementation Tasks
+
+**New file:** `services/SocialDataService.ts`
+**Files to modify:** `HandlebarsListView.tsx` (register helpers, event delegation), `ListDataService.ts` (optionally enrich items with social data)
+
+**Tasks:**
+1. **`SocialDataService`** — New service wrapping the SharePoint REST social endpoints:
+   - `/_api/web/lists('${listId}')/items(${itemId})/likedBy` — get who liked an item
+   - `/_api/web/lists('${listId}')/items(${itemId})/like` / `unlike` — toggle like (POST)
+   - `/_api/web/lists('${listId}')/items(${itemId})/rate(value)` — submit a 1-5 star rating (POST)
+   - Ratings metadata lives in `OData__AverageRating` and `OData__RatingCount` fields (add to ViewFields in ViewXml if rating is enabled on the list)
+   - Comment count: `/_api/web/lists('${listId}')/items(${itemId})/Comments/$count`
+2. **Detect mode** — Query list settings (`EnableRating`, `EnableLikes`) via REST to determine which mode applies. Cache this per list.
+3. **Enrich items** — After fetching list data, optionally batch-fetch social data and merge onto each item:
+   - `_likes: { count: 5, likedByMe: true }`
+   - `_rating: { average: 3.7, count: 12, myRating: 4 }`
+   - `_comments: { count: 3 }`
+4. **Handlebars helpers:**
+   - `{{likes this}}` — renders like count
+   - `{{likedByMe this}}` — returns true/false for conditional styling
+   - `{{rating this}}` — renders average rating
+   - `{{ratingCount this}}` — number of ratings
+   - `{{myRating this}}` — current user's rating (0 if unrated)
+   - `{{commentCount this}}` — number of comments on the item
+5. **Template actions via data attributes:**
+   - `data-hbwp-like="{{ID}}"` — clicking toggles like, re-fetches social data for that item
+   - `data-hbwp-rate="{{ID}}" data-hbwp-rate-value="4"` — submits a rating
+   - `data-hbwp-comments="{{ID}}"` — could open a comments panel (future)
+6. **Event delegation** — In the component's container click handler, detect `data-hbwp-like` and `data-hbwp-rate` attributes, call the `SocialDataService`, update the item's social data in state, and re-render the template
+7. **Caching** — Social data changes frequently; cache briefly (1-2 min) or skip caching. Like/rate actions should optimistically update the UI before the REST call returns
+8. **Rating display component** — Consider a `{{starRating average}}` helper that outputs ★★★☆☆ HTML using the average value
+
+**Template usage examples:**
+```handlebars
+{{#each items}}
+  <div class="item">
+    <h3>{{Title}}</h3>
+    
+    {{!-- Like button --}}
+    <button data-hbwp-like="{{ID}}" class="{{#if (likedByMe this)}}liked{{/if}}">
+      ♥ {{likes this}}
+    </button>
+    
+    {{!-- Star rating --}}
+    <div>{{starRating (rating this)}} ({{ratingCount this}} ratings)</div>
+    
+    {{!-- Comments --}}
+    <span>💬 {{commentCount this}}</span>
+  </div>
+{{/each}}
+```
+
+**Estimated complexity:** Medium-High — REST endpoints are straightforward but batching social data across many items efficiently requires careful design; optimistic UI updates add complexity
+
+---
+
+## Async Data Expansion Helper (hbwp-expand)
+
+A Handlebars block helper that fetches additional data for a list item on demand, rendering loading/notfound/loaded states. Enables drill-down into related data without pre-fetching everything.
+
+- [ ] Implement `{{#hbwp-expand}}` block helper with loading/notfound/loaded sections
+- [ ] Post-render hydration — placeholder divs get replaced when async data arrives
+- [ ] Support expanding from any configured list by key
+- [ ] Support click-to-expand (lazy) and auto-expand (eager) modes
+
+### Concept
+
+```handlebars
+{{#each items}}
+  <h3>{{Title}}</h3>
+  
+  {{#hbwp-expand list="ideas" id=this.IdeaId}}
+    {{!-- Rendered when data loads successfully --}}
+    <p>Idea: {{Title}} — {{Description}}</p>
+    <span>Category: {{Category.Value}}</span>
+  {{else hbwp-loading}}
+    {{!-- Rendered immediately as placeholder --}}
+    <div class="spinner">Loading idea details...</div>
+  {{else hbwp-notfound}}
+    {{!-- Rendered if item not found or fetch fails --}}
+    <p class="muted">Idea not found</p>
+  {{/hbwp-expand}}
+{{/each}}
+```
+
+### Implementation Tasks
+
+**Files to modify:** `HandlebarsListView.tsx` (helper registration, post-render hydration), `ListDataService.ts` (single-item fetch)
+
+**Tasks:**
+1. **Helper registration** — `hbwp-expand` is a block helper that outputs a placeholder `<div data-hbwp-expand data-list="..." data-item-id="..." data-template-id="...">`. The loading block is rendered inline immediately. The success/notfound templates are stored as compiled functions keyed by a unique ID.
+2. **Template storage** — On first render, each `hbwp-expand` invocation compiles its inner blocks (success, notfound) and stores them in a Map keyed by a unique element ID. These are used during hydration.
+3. **Post-render hydration** — After `dangerouslySetInnerHTML` renders, scan for `[data-hbwp-expand]` elements. For each, fetch the item from SharePoint (or from an already-loaded data source cache), render the appropriate template block, and replace the placeholder.
+4. **Data fetching** — Single-item fetch: `list.items.getById(id)` or check if the item exists in an already-fetched data source. If the data source is already loaded (e.g., `ideas` was configured as an additional data source), skip the fetch and look up locally.
+5. **Click-to-expand mode** — If `lazy=true` is set, don't auto-fetch. Instead render the loading block with a click handler. On click, fetch and replace.
+6. **Caching** — Expanded items should be cached so re-renders don't re-fetch. Use the existing CacheService with short TTL.
+7. **Cleanup** — On component unmount or re-render, clear stored template functions and any pending fetch promises.
+
+**Estimated complexity:** High — Handlebars is synchronous, so this requires a two-phase render pattern (render placeholders → hydrate after mount). See [docs/analysis-async-handlebars.md](analysis-async-handlebars.md) for detailed feasibility analysis.

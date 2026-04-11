@@ -373,8 +373,8 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     // This allows referencing as {{announcements}} instead of {{dataSources.announcements}}
     const templateData: ITemplateData = {
       items: primaryItems,
-      user: this.props.userProfile || {},
-      page: this.props.pageData || {},
+      user: ListDataService.normalizeData(this.props.userProfile || {}),
+      page: ListDataService.normalizeData(this.props.pageData || {}),
       // Include instanceId for unique DOM element IDs when multiple web parts are on a page
       wpId: this.props.instanceId,
       instanceId: this.props.instanceId,
@@ -389,7 +389,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
    * Gets primary list data using the ListDataService
    */
   private async getPrimaryListData(tokenContext: ITokenContext): Promise<Array<any>> {
-    const { site, list, view, viewXml, camlFilter, expandFields } = this.props;
+    const { site, list, view, viewXml, camlFilter } = this.props;
 
     if (!this.listDataService || !site?.url || !list || !view) {
       return [];
@@ -402,8 +402,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       listId: list,
       viewId: view,
       viewXml: viewXml || undefined,
-      camlFilter: resolvedFilter,
-      expandFields: expandFields || undefined
+      camlFilter: resolvedFilter
     });
 
     return result.items;
@@ -433,8 +432,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
           listId: ds.listId,
           viewId: ds.viewId,
           viewXml: ds.viewXml || undefined,
-          camlFilter: ds.camlFilter ? resolveTokens(ds.camlFilter, tokenContext) : undefined,
-          expandFields: ds.expandFields || undefined
+          camlFilter: ds.camlFilter ? resolveTokens(ds.camlFilter, tokenContext) : undefined
         },
         timeoutMinutes: ds.cacheTimeoutMinutes
       }));
