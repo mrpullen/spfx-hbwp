@@ -206,11 +206,11 @@
             {{#each Editor}}
               {{#if @first}}
                 <div class="idea-persona">
-                  <fluent-avatar
-                    name="{{Title}}"
-                    size="36"
-                    image="{{../../siteUrl}}/_layouts/15/userphoto.aspx?size=M&amp;username={{Email}}">
-                  </fluent-avatar>
+                  <img
+                    alt="{{Title}}"
+                    src="/_layouts/15/userphoto.aspx?size=M&amp;username={{Email}}"
+                    style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover;"/>
+                  
                   <div class="persona-details">
                     <a href="mailto:{{Email}}" class="persona-name">{{Title}}</a>
                     <div class="persona-actions">
