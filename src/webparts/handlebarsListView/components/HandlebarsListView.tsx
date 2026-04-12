@@ -159,9 +159,14 @@ Handlebars.registerHelper('hbwp-hidden', function(options: Handlebars.HelperOpti
   );
 });
 
-// Custom helper: render a self-contained like/unlike toggle button.
+// SVG path constants for heart icons (Fluent UI HeartFill / Heart)
+const HEART_FILL_SVG = '<svg data-hbwp-heart-svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M7.99 3.31C6.57 1.07 2.54.73 1.09 3.52c-1.37 2.64.46 5.47 3.93 8.27.96.78 1.95 1.46 2.98 2.21 1.02-.75 2.01-1.43 2.97-2.2 3.47-2.8 5.3-5.64 3.93-8.28C13.45.73 9.42 1.07 7.99 3.31z"/></svg>';
+const HEART_OUTLINE_SVG = '<svg data-hbwp-heart-svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M7.99 3.31C6.57 1.07 2.54.73 1.09 3.52c-1.37 2.64.46 5.47 3.93 8.27.96.78 1.95 1.46 2.98 2.21 1.02-.75 2.01-1.43 2.97-2.2 3.47-2.8 5.3-5.64 3.93-8.28C13.45.73 9.42 1.07 7.99 3.31z" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>';
+
+// Custom helper: render a self-contained like/unlike toggle button matching OOTB SharePoint heart.
 // Usage: {{likeButton ID LikesCount LikedBy ../user.id}}
-Handlebars.registerHelper('likeButton', function(itemId: any, likesCount: any, likedByArray: any, userId: any) {
+// With color override: {{likeButton ID LikesCount LikedBy ../user.id color="#e3008c"}}
+Handlebars.registerHelper('likeButton', function(this: any, itemId: any, likesCount: any, likedByArray: any, userId: any, options: any) {
   const count = parseInt(likesCount, 10) || 0;
   let liked = false;
   if (Array.isArray(likedByArray)) {
@@ -170,14 +175,25 @@ Handlebars.registerHelper('likeButton', function(itemId: any, likesCount: any, l
       return String(propValue) === String(userId);
     });
   }
-  const heart = liked ? '\u2665' : '\u2661';
-  const heartColor = liked ? '#d13438' : '#c8c6c4';
-  const label = count === 1 ? 'like' : 'likes';
+  const activeColor = (options && options.hash && options.hash.color) || 'var(--ms-palette-neutralPrimary, #323130)';
+  const inactiveColor = 'var(--ms-semanticColors-infoIcon, #605e5c)';
+  const heartSvg = liked ? HEART_FILL_SVG : HEART_OUTLINE_SVG;
+  const heartColor = liked ? activeColor : inactiveColor;
+  const title = liked
+    ? 'You have liked this item, click to unlike it'
+    : 'Click to like this item';
+  const label = count === 1 ? 'Like' : 'Likes';
+  const escapedId = Handlebars.Utils.escapeExpression(String(itemId));
+  const escapedActiveColor = Handlebars.Utils.escapeExpression(activeColor);
   return new Handlebars.SafeString(
-    `<button class="idea-likes" data-hbwp-like="${Handlebars.Utils.escapeExpression(String(itemId))}" data-hbwp-liked="${liked}">` +
-    `<span data-hbwp-heart style="font-size:18px;color:${heartColor};transition:transform 0.15s ease">${heart}</span>` +
-    `<span data-hbwp-count>${count} ${label}</span>` +
-    `</button>`
+    `<div data-hbwp-like="${escapedId}" data-hbwp-liked="${liked}" data-hbwp-active-color="${escapedActiveColor}" ` +
+    `tabindex="0" role="button" title="${title}" ` +
+    `style="align-items:center;background:none;border-radius:2px;border:none;cursor:pointer;display:inline-flex;height:fit-content;min-height:28px;width:fit-content;padding:0;font-family:inherit">` +
+    `<div data-hbwp-heart style="align-items:center;background-color:transparent;color:${heartColor};display:flex;font-size:16px;height:28px;justify-content:center;width:28px;position:relative">` +
+    heartSvg +
+    `</div>` +
+    `<div data-hbwp-count style="font-size:12px;color:var(--ms-palette-neutralPrimary,#323130);white-space:nowrap">${count} ${label}</div>` +
+    `</div>`
   );
 });
 
@@ -387,24 +403,27 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       const itemId = likeBtn.getAttribute('data-hbwp-like');
       const liked = likeBtn.getAttribute('data-hbwp-liked') === 'true';
 
-      // Optimistic UI — use data attributes and inline styles to avoid scoped-class issues
-      const heart = likeBtn.querySelector('[data-hbwp-heart]') as HTMLElement;
-      const countSpan = likeBtn.querySelector('[data-hbwp-count]');
-      if (heart) {
+      // Optimistic UI — swap SVG heart and toggle colors to match OOTB SharePoint
+      const heartWrap = likeBtn.querySelector('[data-hbwp-heart]') as HTMLElement;
+      const countEl = likeBtn.querySelector('[data-hbwp-count]');
+      const activeColor = likeBtn.getAttribute('data-hbwp-active-color') || 'var(--ms-palette-neutralPrimary, #323130)';
+      const inactiveColor = 'var(--ms-semanticColors-infoIcon, #605e5c)';
+      if (heartWrap) {
         if (liked) {
-          heart.textContent = '\u2661';
-          heart.style.color = '#c8c6c4';
+          heartWrap.innerHTML = HEART_OUTLINE_SVG;
+          heartWrap.style.color = inactiveColor;
         } else {
-          heart.textContent = '\u2665';
-          heart.style.color = '#d13438';
+          heartWrap.innerHTML = HEART_FILL_SVG;
+          heartWrap.style.color = activeColor;
         }
       }
-      if (countSpan) {
-        const current = parseInt(countSpan.textContent || '0', 10) || 0;
+      if (countEl) {
+        const current = parseInt(countEl.textContent || '0', 10) || 0;
         const newCount = liked ? Math.max(0, current - 1) : current + 1;
-        countSpan.textContent = newCount + (newCount === 1 ? ' like' : ' likes');
+        countEl.textContent = newCount + (newCount === 1 ? ' Like' : ' Likes');
       }
       likeBtn.setAttribute('data-hbwp-liked', liked ? 'false' : 'true');
+      likeBtn.setAttribute('title', liked ? 'Click to like this item' : 'You have liked this item, click to unlike it');
 
       // Fire API call
       this.handleSocialAction({ action: 'like', itemId: itemId || '', currentlyLiked: liked });

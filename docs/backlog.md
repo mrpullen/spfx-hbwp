@@ -284,3 +284,154 @@ A Handlebars block helper that fetches additional data for a list item on demand
 7. **Cleanup** — On component unmount or re-render, clear stored template functions and any pending fetch promises.
 
 **Estimated complexity:** High — Handlebars is synchronous, so this requires a two-phase render pattern (render placeholders → hydrate after mount). See [docs/analysis-async-handlebars.md](analysis-async-handlebars.md) for detailed feasibility analysis.
+
+---
+
+## Enable Extensibility Library Import
+
+Add support for importing an external SPFx library component (like PnP Modern Search does), so third-party or shared Handlebars helpers and web components can be registered at runtime.
+
+### How PnP Search Does It
+
+PnP Search v4 defines an `IExtensibilityLibrary` interface. The Search Results web part:
+1. Takes a library component manifest ID from the property pane
+2. Loads it at runtime via `SPComponentLoader.loadComponentById()`
+3. Calls `getCustomWebComponents()`, `registerHandlebarsCustomizations()`, etc. on the loaded library
+4. Registers the returned web components via `customElements.define()` and passes the Handlebars namespace for helper registration
+
+### Implementation Tasks
+
+**Files to create:**
+- `src/webparts/handlebarsListView/extensibility/IExtensibilityLibrary.ts` — interface definition
+
+**Files to modify:**
+- `HandlebarsListViewWebPart.ts` — property pane field for library manifest ID, load library in `onInit()`
+- `HandlebarsListView.tsx` — pass loaded library to component, call registration methods before template compile
+- `IHandlebarsListViewProps.ts` — add optional `extensibilityLibrary` prop
+
+**Tasks:**
+1. **Define `IHbwpExtensibilityLibrary` interface:**
+   ```typescript
+   interface IHbwpExtensibilityLibrary {
+     getCustomWebComponents?(): IComponentDefinition[];
+     registerHandlebarsCustomizations?(handlebarsNamespace: typeof Handlebars): void;
+     getCustomDataSources?(): IDataSourceDefinition[];
+     onInit?(context: IHbwpExtensibilityContext): Promise<void>;
+   }
+   ```
+2. **Property pane config** — Add a text field for the library component manifest GUID. Validate it's a valid GUID format.
+3. **Load library at runtime** — In `onInit()`, use `SPComponentLoader.loadComponentById<IHbwpExtensibilityLibrary>(manifestId)` to load the library. Cache the reference.
+4. **Register web components** — Call `getCustomWebComponents()` and iterate: `customElements.define(name, componentClass)` (guard with `customElements.get()` to avoid double-registration).
+5. **Register helpers** — Call `registerHandlebarsCustomizations(Handlebars)` before template compilation.
+6. **Context passing** — Create an `IHbwpExtensibilityContext` with `siteUrl`, `listId`, `spHttpClient`, `aadHttpClientFactory`, so library authors can make auth-aware REST calls.
+7. **Multiple libraries** — Support an array of manifest IDs (not just one) so multiple libraries can be loaded.
+8. **Error handling** — If a library fails to load, log a warning and continue. Don't block template rendering.
+
+**Estimated complexity:** Medium — `SPComponentLoader` API is straightforward; main work is interface design and the property pane UX.
+
+---
+
+## Web Component Library (hbwp-components)
+
+Extract interactive UI patterns from this project into a standalone SPFx library component that can be consumed by both this web part AND PnP Modern Search (or any Handlebars-based SPFx web part).
+
+### Component Inventory
+
+#### Tier 1 — Strong candidates (self-contained interactive behavior)
+
+| Component | Tag | Attributes | What It Does | Current Source |
+|---|---|---|---|---|
+| **Like Button** | `<hbwp-like-button>` | `item-id`, `list-id`, `site-url`, `count`, `liked` | Toggle like/unlike with optimistic UI, heart icon, count display. Makes REST calls directly via `fetch()`. | `likeButton` helper + `handleContainerClick` delegation |
+| **Star Rating** | `<hbwp-star-rating>` | `value`, `max`, `item-id`, `list-id`, `site-url`, `interactive` | Displays ★★★☆☆. When `interactive`, click submits rating via REST. | `starRating` helper + `data-hbwp-rate` delegation |
+| **Form Container** | `<hbwp-form>` | `endpoint`, `method`, `site-url`, `list-id`, `auth-type`, `reset` | Wraps child inputs, intercepts submit, posts to SP list or HTTP endpoint, shows success/error. | `hbwp-form` helper + `handleContainerSubmit` + `FormSubmitService` |
+| **Persona** | `<hbwp-persona>` | `name`, `email`, `sip`, `picture-url`, `size`, `show-actions` | User photo + name + email/chat action links. Uses `userphoto.aspx` for avatar. | Repeated pattern in idea-cards, cards, master-detail templates |
+
+#### Tier 2 — Good candidates (reusable UI patterns)
+
+| Component | Tag | Attributes | What It Does | Current Source |
+|---|---|---|---|---|
+| **Bar Chart** | `<hbwp-bar-chart>` | `data` (JSON), `label-key`, `value-key`, `color` | Simple horizontal bar chart for survey results / metrics | survey.hbs results visualization |
+| **Metro Tile** | `<hbwp-metro-tile>` | `href`, `label`, `badge`, `icon` (slot) | Dashboard-style tile with icon, label, and optional badge count | metro-links.hbs |
+| **Detail Dialog** | `<hbwp-detail-dialog>` | `title`, slotted content | Click-to-open modal for item details. Wraps `<fluent-dialog>`. | cards.hbs, announcements.hbs |
+
+#### Tier 3 — Keep as Handlebars helpers (register via `registerHandlebarsCustomizations`)
+
+| Helper | Why Not a Web Component |
+|---|---|
+| `filter`, `percentage`, `substring`, `concat`, `json` | Pure data/string utilities, no DOM output |
+| `hbwp-input`, `hbwp-textarea`, `hbwp-select`, `hbwp-checkbox`, `hbwp-submit`, `hbwp-hidden` | Thin wrappers over existing Fluent UI web components |
+| `findItem`, `findItems` (future) | Data lookup, no DOM |
+
+### Architecture
+
+```
+spfx-hbwp-components/                      ← New SPFx library component project
+  src/
+    HbwpComponentsLibrary.ts               ← implements IHbwpExtensibilityLibrary
+      ├── getCustomWebComponents()         ← returns all Tier 1 + Tier 2 components
+      └── registerHandlebarsCustomizations(Handlebars)
+            ├── filter, percentage, substring, concat, json
+            ├── likeButton (emits <hbwp-like-button> tag)
+            ├── starRating (emits <hbwp-star-rating> tag)
+            └── hbwp-form helpers
+    components/
+      ├── HbwpLikeButton.ts                ← extends HTMLElement, Shadow DOM
+      ├── HbwpStarRating.ts                ← extends HTMLElement, Shadow DOM
+      ├── HbwpForm.ts                      ← extends HTMLElement, Shadow DOM
+      ├── HbwpPersona.ts                   ← extends HTMLElement, Shadow DOM
+      ├── HbwpBarChart.ts                  ← extends HTMLElement, Shadow DOM
+      ├── HbwpMetroTile.ts                 ← extends HTMLElement, Shadow DOM
+      └── HbwpDetailDialog.ts              ← extends HTMLElement, Shadow DOM
+    services/
+      ├── SpRestClient.ts                  ← fetch-based SP REST (no PnPjs dependency)
+      │     ├── like(siteUrl, listId, itemId)
+      │     ├── unlike(siteUrl, listId, itemId)
+      │     ├── rate(siteUrl, listId, itemId, value)
+      │     ├── addItem(siteUrl, listId, data)
+      │     └── getRequestDigest(siteUrl)
+      └── CacheService.ts                  ← portable localStorage cache (copy from hbwp)
+    helpers/
+      └── index.ts                         ← all Handlebars helper registrations
+```
+
+### Key Design Decisions
+
+1. **No PnPjs dependency** — Web components use `fetch()` with `credentials: 'same-origin'` for SP REST calls. The auth cookie on the SharePoint page handles authentication. Need `X-RequestDigest` for POST operations (obtained from `/_api/contextinfo`).
+
+2. **Shadow DOM** — Each component renders in Shadow DOM for style isolation. This replaces `scopeCssClasses` entirely. Templates can still style the host element via `::part()` or CSS custom properties.
+
+3. **Handlebars helpers as wrappers** — The `registerHandlebarsCustomizations` method registers helpers that emit the web component tags:
+   ```typescript
+   Handlebars.registerHelper('likeButton', (itemId, count, likedBy, userId, options) => {
+     const liked = /* check likedBy array */;
+     return new Handlebars.SafeString(
+       `<hbwp-like-button item-id="${itemId}" count="${count}" liked="${liked}" 
+         site-url="${options.data.root.siteUrl}" list-id="${options.data.root.listId}">
+        </hbwp-like-button>`
+     );
+   });
+   ```
+
+4. **Works in both HBWP and PnP Search** — PnP Search calls `getCustomWebComponents()` and `registerHandlebarsCustomizations()` on the library. HBWP would do the same via the extensibility library import (see backlog item above).
+
+5. **Progressive extraction** — Start by building `<hbwp-like-button>` as a proof of concept. Once the pattern is proven, extract the rest incrementally.
+
+### Implementation Phases
+
+| Phase | Components | Effort |
+|---|---|---|
+| **Phase 1: Foundation** | Project scaffolding, `SpRestClient`, `IHbwpExtensibilityLibrary` impl, `<hbwp-like-button>` | Medium |
+| **Phase 2: Social** | `<hbwp-star-rating>`, interactive rating support | Low |
+| **Phase 3: Forms** | `<hbwp-form>`, form helper wrappers | Medium |
+| **Phase 4: Display** | `<hbwp-persona>`, `<hbwp-bar-chart>`, `<hbwp-metro-tile>`, `<hbwp-detail-dialog>` | Medium |
+| **Phase 5: Integration** | Wire into HBWP extensibility loader, test with PnP Search, documentation | Medium |
+
+### PnP Search Compatibility Notes
+
+- PnP Search expects `IExtensibilityLibrary` from `@pnp/modern-search-extensibility`
+- Our `IHbwpExtensibilityLibrary` should be a superset — implement both interfaces
+- Web components must work in light DOM context (PnP Search doesn't use Shadow DOM for its layout)
+- Consider a `shadow` attribute: `<hbwp-like-button shadow="false">` to opt out of Shadow DOM for compatibility
+- Handlebars namespace passed to `registerHandlebarsCustomizations()` is PnP Search's instance, not a global — helpers must be registered on the passed namespace
+
+**Estimated complexity:** High overall (spans multiple phases), but each phase is Medium individually.
