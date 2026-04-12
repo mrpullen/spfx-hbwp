@@ -5,8 +5,8 @@
 Paging applies to primary list items only. Now that we use `renderListDataAsStream`, paging metadata (`NextHref`, `FirstRow`, `LastRow`, `RowLimit`) is returned natively — no workarounds needed.
 
 - [ ] Accept `Paging` parameter in `fetchFromSharePoint` to request a specific page
-- [ ] Add `prevHref` to `IListDataResult` (SharePoint returns it, PnPjs type just doesn't declare it)
-- [ ] Expose paging state in template context (`{{paging.hasNext}}`, `{{paging.hasPrev}}`, `{{paging.firstRow}}`, `{{paging.lastRow}}`, `{{paging.rowLimit}}`)
+- [x] Add `prevHref` to `IListDataResult` (SharePoint returns it, PnPjs type just doesn't declare it)
+- [x] Expose paging state in template context (`{{paging.hasNext}}`, `{{paging.hasPrev}}`, `{{paging.firstRow}}`, `{{paging.lastRow}}`, `{{paging.rowLimit}}`)
 - [ ] Build `hbwp-paging` Handlebars block helper to render prev/next navigation
 - [ ] Wire click events (`data-hbwp-page="next"` / `data-hbwp-page="prev"`) through event delegation to trigger re-fetch
 - [ ] Maintain paging state in component state across re-renders
@@ -90,13 +90,16 @@ Cross-list lookup joining via Handlebars helpers. Enables multi-level lookup tra
 
 ---
 
-## Query Parameter Token Support
+## ~~Query Parameter Token Support~~ ✅ Done
 
-We want to be able to link to query / parameter name 
+~~We want to be able to link to query / parameter name~~
 
-- [ ] Support `{{query.paramName}}` tokens in CAML filters and HTTP endpoint URLs
-- [ ] Parse URL query string parameters at runtime and inject into token context
-- [ ] Allow dynamic filtering based on URL (e.g., `{{query.id}}`, `{{query.status}}`)
+- [x] Support `{{query.paramName}}` tokens in CAML filters and HTTP endpoint URLs
+- [x] Parse URL query string parameters at runtime and inject into token context
+- [x] Allow dynamic filtering based on URL (e.g., `{{query.id}}`, `{{query.status}}`)
+- [x] Add `query` field to `ITokenContext` interface
+- [x] Inject `query` into both CAML filter token context and full token context
+- [x] Expose `query` in Handlebars template data
 
 ### Implementation Tasks
 
@@ -174,16 +177,19 @@ We will definitely need to be able to modify the data returned - we should cache
 
 ---
 
-## Social Integration (Likes, Ratings & Comments)
+## Social Integration (Likes, Ratings & Comments) — Partially Done
 
 Enable templates to show and interact with SharePoint social features — likes/ratings and comments — on list items. Operates in two modes depending on list rating settings.
 
-- [ ] Create `SocialDataService` to fetch and post likes, ratings, and comment counts
-- [ ] Support **Likes mode** — show like count, current user liked state, toggle like
-- [ ] Support **Ratings mode** — show average rating, current user's rating, submit rating
+- [x] Create `SocialDataService` to fetch and post likes, ratings, and comment counts
+- [x] Support **Likes mode** — show like count, current user liked state, toggle like
+- [x] Support **Ratings mode** — show average rating, current user's rating, submit rating
 - [ ] Fetch comment counts per item
-- [ ] Register Handlebars helpers for template access
-- [ ] Add template event delegation for like/rate/comment actions
+- [x] Register Handlebars helpers for template access (`likeButton`, `starRating`)
+- [x] Add template event delegation for like/rate actions (`handleContainerClick`)
+- [x] Optimistic UI for like toggle (OOTB SharePoint-style heart with SVG)
+- [x] Fire-and-forget API calls with cache invalidation
+- [ ] Comments panel (`data-hbwp-comments`)
 
 ### Implementation Tasks
 
