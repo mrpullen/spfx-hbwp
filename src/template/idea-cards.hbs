@@ -201,15 +201,7 @@
 
             {{!-- Likes row (interactive — click to toggle like) --}}
             <div class="idea-stats">
-              <button class="idea-likes" data-hbwp-like="{{ID}}"
-                data-hbwp-liked="{{#filter LikedBy 'Id' ../user.id}}true{{else}}false{{/filter}}">
-                {{#filter LikedBy "Id" ../user.id}}
-                  <span class="heart heart-liked">♥</span>
-                {{else}}
-                  <span class="heart heart-not-liked">♡</span>
-                {{/filter}}
-                <span>{{LikesCount}} {{#is LikesCount "1"}}like{{else}}likes{{/is}}</span>
-              </button>
+              {{likeButton ID LikesCount LikedBy ../user.id}}
             </div>
 
             {{!-- Author Persona --}}

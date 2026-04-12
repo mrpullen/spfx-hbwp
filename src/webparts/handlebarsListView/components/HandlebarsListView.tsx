@@ -5,7 +5,7 @@ import Handlebars from "handlebars";
 
 import helpers from 'handlebars-helpers'
 import ReactHtmlParser from 'react-html-parser';
-import { ListDataService, IListDataResult, HttpDataService, FormSubmitService, generateFormHandlerScript, generateFormResponseHandlerScript, SocialDataService, generateSocialHandlerScript, ITokenContext } from '../services';
+import { ListDataService, IListDataResult, HttpDataService, FormSubmitService, SocialDataService, ITokenContext } from '../services';
 import { scopeCssClasses } from './scopeCssClasses';
 
 /**
@@ -159,6 +159,28 @@ Handlebars.registerHelper('hbwp-hidden', function(options: Handlebars.HelperOpti
   );
 });
 
+// Custom helper: render a self-contained like/unlike toggle button.
+// Usage: {{likeButton ID LikesCount LikedBy ../user.id}}
+Handlebars.registerHelper('likeButton', function(itemId: any, likesCount: any, likedByArray: any, userId: any) {
+  const count = parseInt(likesCount, 10) || 0;
+  let liked = false;
+  if (Array.isArray(likedByArray)) {
+    liked = likedByArray.some((item: any) => {
+      const propValue = item.Id !== undefined ? item.Id : item.id;
+      return String(propValue) === String(userId);
+    });
+  }
+  const heart = liked ? '\u2665' : '\u2661';
+  const heartColor = liked ? '#d13438' : '#c8c6c4';
+  const label = count === 1 ? 'like' : 'likes';
+  return new Handlebars.SafeString(
+    `<button class="idea-likes" data-hbwp-like="${Handlebars.Utils.escapeExpression(String(itemId))}" data-hbwp-liked="${liked}">` +
+    `<span data-hbwp-heart style="font-size:18px;color:${heartColor};transition:transform 0.15s ease">${heart}</span>` +
+    `<span data-hbwp-count>${count} ${label}</span>` +
+    `</button>`
+  );
+});
+
 // Custom helper: filter an array by property value (handles SharePoint lookup fields)
 Handlebars.registerHelper('filter', function(this: any, array: any[], property: string, value: any, options: any) {
   if (!Array.isArray(array)) {
@@ -289,24 +311,29 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     // Bind event handlers
     this.handleFormSubmit = this.handleFormSubmit.bind(this);
     this.handleSocialAction = this.handleSocialAction.bind(this);
+    this.handleContainerClick = this.handleContainerClick.bind(this);
+    this.handleContainerSubmit = this.handleContainerSubmit.bind(this);
   }
 
 
   public async componentDidMount(): Promise<void> {
     await this.getHandlebarsTemplate();
     
-    // Add event listeners
+    // Attach delegated event listeners directly on the container.
+    // Injected <script> tags don't execute via ReactHtmlParser, so all
+    // click / submit delegation must live here in the React component.
     if (this.containerRef.current) {
+      this.containerRef.current.addEventListener('click', this.handleContainerClick);
+      this.containerRef.current.addEventListener('submit', this.handleContainerSubmit);
       this.containerRef.current.addEventListener('hbwp-form-submit', this.handleFormSubmit as EventListener);
-      this.containerRef.current.addEventListener('hbwp-social-action', this.handleSocialAction as EventListener);
     }
   }
   
   public componentWillUnmount(): void {
-    // Remove event listeners
     if (this.containerRef.current) {
+      this.containerRef.current.removeEventListener('click', this.handleContainerClick);
+      this.containerRef.current.removeEventListener('submit', this.handleContainerSubmit);
       this.containerRef.current.removeEventListener('hbwp-form-submit', this.handleFormSubmit as EventListener);
-      this.containerRef.current.removeEventListener('hbwp-social-action', this.handleSocialAction as EventListener);
     }
   }
 
@@ -345,35 +372,135 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
   /**
    * Handles social action events (like/unlike/rate) from the template
    */
-  private async handleSocialAction(event: CustomEvent): Promise<void> {
-    const { action, itemId, currentlyLiked, value } = event.detail;
+  /**
+   * Delegated click handler for social actions (like/unlike, rate).
+   * Attached directly to the container — no injected <script> needed.
+   */
+  private handleContainerClick(e: Event): void {
+    const target = e.target as HTMLElement;
+    const likeBtn = target.closest<HTMLElement>('[data-hbwp-like]');
+    const rateBtn = target.closest<HTMLElement>('[data-hbwp-rate]');
+
+    if (likeBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const itemId = likeBtn.getAttribute('data-hbwp-like');
+      const liked = likeBtn.getAttribute('data-hbwp-liked') === 'true';
+
+      // Optimistic UI — use data attributes and inline styles to avoid scoped-class issues
+      const heart = likeBtn.querySelector('[data-hbwp-heart]') as HTMLElement;
+      const countSpan = likeBtn.querySelector('[data-hbwp-count]');
+      if (heart) {
+        if (liked) {
+          heart.textContent = '\u2661';
+          heart.style.color = '#c8c6c4';
+        } else {
+          heart.textContent = '\u2665';
+          heart.style.color = '#d13438';
+        }
+      }
+      if (countSpan) {
+        const current = parseInt(countSpan.textContent || '0', 10) || 0;
+        const newCount = liked ? Math.max(0, current - 1) : current + 1;
+        countSpan.textContent = newCount + (newCount === 1 ? ' like' : ' likes');
+      }
+      likeBtn.setAttribute('data-hbwp-liked', liked ? 'false' : 'true');
+
+      // Fire API call
+      this.handleSocialAction({ action: 'like', itemId: itemId || '', currentlyLiked: liked });
+    }
+
+    if (rateBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const rateItemId = rateBtn.getAttribute('data-hbwp-rate');
+      const rateValue = rateBtn.getAttribute('data-hbwp-rate-value');
+      this.handleSocialAction({ action: 'rate', itemId: rateItemId || '', value: rateValue });
+    }
+  }
+
+  /**
+   * Delegated submit handler for forms with data-hbwp-submit.
+   */
+  private handleContainerSubmit(e: Event): void {
+    const form = (e.target as HTMLElement).closest<HTMLFormElement>('form[data-hbwp-submit]');
+    if (!form) return;
+
+    e.preventDefault();
+
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return;
+    }
+
+    const endpointKey = form.dataset.hbwpSubmit;
+    const submitBtn = form.querySelector<HTMLButtonElement>('[type="submit"]');
+    const originalBtnText = submitBtn ? submitBtn.textContent || '' : '';
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting...';
+    }
+
+    const formData: Record<string, any> = {};
+    const formElements = form.elements;
+    for (let i = 0; i < formElements.length; i++) {
+      const el = formElements[i] as any;
+      if (el.name && !el.disabled) {
+        if (el.type === 'checkbox') {
+          formData[el.name] = el.checked;
+        } else if (el.type === 'radio') {
+          if (el.checked) formData[el.name] = el.value;
+        } else if (el.tagName === 'SELECT' && el.multiple) {
+          formData[el.name] = Array.from(el.selectedOptions as ArrayLike<HTMLOptionElement>).map((o: HTMLOptionElement) => o.value);
+        } else {
+          formData[el.name] = el.value;
+        }
+      }
+    }
+
+    // Dispatch CustomEvent so existing handleFormSubmit picks it up
+    this.containerRef.current?.dispatchEvent(new CustomEvent('hbwp-form-submit', {
+      bubbles: true,
+      detail: {
+        endpointKey,
+        formData,
+        wpId: this.props.instanceId,
+        form,
+        submitButton: submitBtn,
+        originalButtonText: originalBtnText
+      }
+    }));
+  }
+
+  /**
+   * Processes a social action (like/unlike or rate).
+   */
+  private handleSocialAction(detail: { action: string; itemId: string; currentlyLiked?: boolean; value?: any }): void {
+    const { action, itemId, currentlyLiked, value } = detail;
     const siteUrl = this.props.site?.url;
     const listId = this.props.list;
 
     if (!this.socialDataService || !siteUrl || !listId) return;
 
-    try {
-      if (action === 'like') {
-        // Fire-and-forget: the client script already applied optimistic UI.
-        // Don't re-render — SharePoint may not have propagated the change yet.
-        this.socialDataService.toggleLike(siteUrl, listId, Number(itemId), currentlyLiked === true || currentlyLiked === 'true')
-          .then(() => {
-            // Invalidate cache so the next full render picks up the new state
-            if (this.listDataService) {
-              this.listDataService.clearListCache(siteUrl, listId, this.props.view || '');
-            }
-          })
-          .catch((error: any) => console.error('Like toggle failed:', error));
-      } else if (action === 'rate') {
-        await this.socialDataService.rate(siteUrl, listId, Number(itemId), Number(value));
-        // Re-fetch for ratings since server computes the average
-        if (this.listDataService) {
-          this.listDataService.clearListCache(siteUrl, listId, this.props.view || '');
-        }
-        await this.getHandlebarsTemplate();
-      }
-    } catch (error) {
-      console.error('Social action failed:', error);
+    if (action === 'like') {
+      // Fire-and-forget: optimistic UI already applied.
+      this.socialDataService.toggleLike(siteUrl, listId, Number(itemId), !!currentlyLiked)
+        .then(() => {
+          if (this.listDataService) {
+            this.listDataService.clearListCache(siteUrl, listId, this.props.view || '');
+          }
+        })
+        .catch((error: any) => console.error('Like toggle failed:', error));
+    } else if (action === 'rate') {
+      this.socialDataService.rate(siteUrl, listId, Number(itemId), Number(value))
+        .then(() => {
+          if (this.listDataService) {
+            this.listDataService.clearListCache(siteUrl, listId, this.props.view || '');
+          }
+          return this.getHandlebarsTemplate();
+        })
+        .catch((error: any) => console.error('Rating failed:', error));
     }
   }
 
@@ -428,15 +555,8 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     const template = Handlebars.compile(scopedTemplate);
     const templateContent = template(templateData);
     
-    // Inject form handler scripts if submit endpoints are configured
-    const formScripts = this.props.submitEndpoints && this.props.submitEndpoints.length > 0
-      ? generateFormHandlerScript(wpId) + generateFormResponseHandlerScript(wpId)
-      : '';
-  
-    const socialScripts = generateSocialHandlerScript(wpId);
-
     this.setState({
-      html: templateContent + formScripts + socialScripts,
+      html: templateContent,
       visible: true
     });
   }
