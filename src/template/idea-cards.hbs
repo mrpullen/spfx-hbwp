@@ -98,6 +98,16 @@
     font-size: 14px;
     color: #605e5c;
     text-decoration: none;
+    background: none;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .idea-likes:hover {
+    background: #f3f2f1;
   }
 
   .idea-likes .heart {
@@ -189,17 +199,17 @@
               </div>
             {{/if}}
 
-            {{!-- Likes row --}}
+            {{!-- Likes row (interactive — click to toggle like) --}}
             <div class="idea-stats">
-              <a href="{{FileRef}}" class="idea-likes">
-                {{!-- Check if current user liked this item --}}
+              <button class="idea-likes" data-hbwp-like="{{ID}}"
+                data-hbwp-liked="{{#filter LikedBy 'Id' ../../user.id}}true{{else}}false{{/filter}}">
                 {{#filter LikedBy "Id" ../../user.id}}
                   <span class="heart heart-liked">♥</span>
                 {{else}}
                   <span class="heart heart-not-liked">♡</span>
                 {{/filter}}
                 <span>{{LikesCount}} {{#is LikesCount "1"}}like{{else}}likes{{/is}}</span>
-              </a>
+              </button>
             </div>
 
             {{!-- Author Persona --}}

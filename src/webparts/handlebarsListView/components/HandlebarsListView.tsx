@@ -5,7 +5,7 @@ import Handlebars from "handlebars";
 
 import helpers from 'handlebars-helpers'
 import ReactHtmlParser from 'react-html-parser';
-import { ListDataService, IListDataResult, HttpDataService, FormSubmitService, generateFormHandlerScript, generateFormResponseHandlerScript, ITokenContext } from '../services';
+import { ListDataService, IListDataResult, HttpDataService, FormSubmitService, generateFormHandlerScript, generateFormResponseHandlerScript, SocialDataService, generateSocialHandlerScript, ITokenContext } from '../services';
 import { scopeCssClasses } from './scopeCssClasses';
 
 /**
@@ -160,9 +160,15 @@ Handlebars.registerHelper('hbwp-hidden', function(options: Handlebars.HelperOpti
 });
 
 // Custom helper: filter an array by property value (handles SharePoint lookup fields)
-Handlebars.registerHelper('filter', function(array: any[], property: string, value: any) {
-  if (!Array.isArray(array)) return [];
-  return array.filter((item: any) => {
+Handlebars.registerHelper('filter', function(this: any, array: any[], property: string, value: any, options: any) {
+  if (!Array.isArray(array)) {
+    // Block usage: render else block if array is not valid
+    if (options && options.fn) {
+      return options.inverse(this);
+    }
+    return [];
+  }
+  const filtered = array.filter((item: any) => {
     const propValue = item[property];
     // Handle lookup fields (SharePoint returns {Id, Title} for lookups)
     if (propValue && typeof propValue === 'object' && propValue.Id !== undefined) {
@@ -170,6 +176,17 @@ Handlebars.registerHelper('filter', function(array: any[], property: string, val
     }
     return String(propValue) === String(value);
   });
+
+  // Block usage: {{#filter arr "prop" val}}...{{else}}...{{/filter}}
+  if (options && options.fn) {
+    if (filtered.length > 0) {
+      return options.fn(this);
+    }
+    return options.inverse(this);
+  }
+
+  // Inline usage: returns the filtered array
+  return filtered;
 });
 
 // Custom helper: calculate percentage (returns integer)
@@ -198,6 +215,20 @@ Handlebars.registerHelper('concat', function(...args: any[]) {
 Handlebars.registerHelper('json', function(context: any) {
   return JSON.stringify(context, null, 2);
 });
+
+// Custom helper: render star rating as HTML (e.g. ★★★★☆)
+Handlebars.registerHelper('starRating', function(rating: any) {
+  const val = parseFloat(rating) || 0;
+  const full = Math.floor(val);
+  const half = (val - full) >= 0.5 ? 1 : 0;
+  const empty = 5 - full - half;
+  return new Handlebars.SafeString(
+    '<span style="color:#ffb900;">' + '\u2605'.repeat(full) +
+    (half ? '\u2BEA' : '') + '</span>' +
+    '<span style="color:#d2d0ce;">' + '\u2606'.repeat(empty) + '</span>'
+  );
+});
+
 /* eslint-enable dot-notation */
 
 export default class HandlebarsListView extends React.Component<IHandlebarsListViewProps, IHandlebarsListViewState> {
@@ -205,6 +236,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
   private listDataService: ListDataService | undefined;
   private httpDataService: HttpDataService | undefined;
   private formSubmitService: FormSubmitService | undefined;
+  private socialDataService: SocialDataService | undefined;
   private containerRef: React.RefObject<HTMLDivElement>;
 
   constructor(props: IHandlebarsListViewProps) {
@@ -249,24 +281,32 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       }
     }
     
-    // Bind event handler
+    // Initialize social data service
+    if (props.sp) {
+      this.socialDataService = new SocialDataService(props.sp);
+    }
+
+    // Bind event handlers
     this.handleFormSubmit = this.handleFormSubmit.bind(this);
+    this.handleSocialAction = this.handleSocialAction.bind(this);
   }
 
 
   public async componentDidMount(): Promise<void> {
     await this.getHandlebarsTemplate();
     
-    // Add form submit event listener
+    // Add event listeners
     if (this.containerRef.current) {
       this.containerRef.current.addEventListener('hbwp-form-submit', this.handleFormSubmit as EventListener);
+      this.containerRef.current.addEventListener('hbwp-social-action', this.handleSocialAction as EventListener);
     }
   }
   
   public componentWillUnmount(): void {
-    // Remove form submit event listener
+    // Remove event listeners
     if (this.containerRef.current) {
       this.containerRef.current.removeEventListener('hbwp-form-submit', this.handleFormSubmit as EventListener);
+      this.containerRef.current.removeEventListener('hbwp-social-action', this.handleSocialAction as EventListener);
     }
   }
 
@@ -300,6 +340,32 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       detail: { success, error, form, submitButton, originalButtonText }
     });
     form.dispatchEvent(resultEvent);
+  }
+
+  /**
+   * Handles social action events (like/unlike/rate) from the template
+   */
+  private async handleSocialAction(event: CustomEvent): Promise<void> {
+    const { action, itemId, currentlyLiked, value } = event.detail;
+    const siteUrl = this.props.site?.url;
+    const listId = this.props.list;
+
+    if (!this.socialDataService || !siteUrl || !listId) return;
+
+    try {
+      if (action === 'like') {
+        await this.socialDataService.toggleLike(siteUrl, listId, Number(itemId), currentlyLiked === true || currentlyLiked === 'true');
+      } else if (action === 'rate') {
+        await this.socialDataService.rate(siteUrl, listId, Number(itemId), Number(value));
+      }
+      // Clear cache and re-fetch to show updated social state
+      if (this.listDataService) {
+        this.listDataService.clearListCache(siteUrl, listId, this.props.view || '');
+      }
+      await this.getHandlebarsTemplate();
+    } catch (error) {
+      console.error('Social action failed:', error);
+    }
   }
 
   public async componentDidUpdate(prevProps: IHandlebarsListViewProps): Promise<void> {
@@ -358,8 +424,10 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       ? generateFormHandlerScript(wpId) + generateFormResponseHandlerScript(wpId)
       : '';
   
+    const socialScripts = generateSocialHandlerScript(wpId);
+
     this.setState({
-      html: templateContent + formScripts,
+      html: templateContent + formScripts + socialScripts,
       visible: true
     });
   }
