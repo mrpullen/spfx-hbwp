@@ -354,15 +354,24 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
 
     try {
       if (action === 'like') {
-        await this.socialDataService.toggleLike(siteUrl, listId, Number(itemId), currentlyLiked === true || currentlyLiked === 'true');
+        // Fire-and-forget: the client script already applied optimistic UI.
+        // Don't re-render — SharePoint may not have propagated the change yet.
+        this.socialDataService.toggleLike(siteUrl, listId, Number(itemId), currentlyLiked === true || currentlyLiked === 'true')
+          .then(() => {
+            // Invalidate cache so the next full render picks up the new state
+            if (this.listDataService) {
+              this.listDataService.clearListCache(siteUrl, listId, this.props.view || '');
+            }
+          })
+          .catch((error: any) => console.error('Like toggle failed:', error));
       } else if (action === 'rate') {
         await this.socialDataService.rate(siteUrl, listId, Number(itemId), Number(value));
+        // Re-fetch for ratings since server computes the average
+        if (this.listDataService) {
+          this.listDataService.clearListCache(siteUrl, listId, this.props.view || '');
+        }
+        await this.getHandlebarsTemplate();
       }
-      // Clear cache and re-fetch to show updated social state
-      if (this.listDataService) {
-        this.listDataService.clearListCache(siteUrl, listId, this.props.view || '');
-      }
-      await this.getHandlebarsTemplate();
     } catch (error) {
       console.error('Social action failed:', error);
     }
