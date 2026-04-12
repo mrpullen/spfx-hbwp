@@ -201,7 +201,8 @@
 
             {{!-- Likes row (interactive — click to toggle like) --}}
             <div class="idea-stats">
-              {{likeButton ID LikesCount LikedBy ../user.id}}
+              {{likeButton ID LikesCount LikedBy ../user.id color="#e3008c"}}
+              <div style="font-size: 14px; color: #605e5c;">{{_CommentCount}} {{#is _CommentCount "1"}}comment{{else}}comments{{/is}}</div>
             </div>
 
             {{!-- Author Persona --}}

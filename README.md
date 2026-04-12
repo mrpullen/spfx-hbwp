@@ -18,6 +18,24 @@ A powerful, flexible SharePoint Framework (SPFx) web part that renders SharePoin
 
 ---
 
+## Backlog
+
+Planned features and enhancements — see [docs/backlog.md](docs/backlog.md) for full details.
+
+| Feature | Complexity | Description |
+|---|---|---|
+| [Paging Control](docs/backlog.md#paging-control) | Medium | Prev/next navigation using `renderListDataAsStream` paging tokens |
+| [Template Lookup Helpers](docs/backlog.md#template-lookup-helpers-client-side-joins) | Low | `findItem` / `findItems` for cross-list client-side joins |
+| [Query Parameter Tokens](docs/backlog.md#query-parameter-token-support) | Low | `{{query.paramName}}` in CAML filters and templates |
+| [Web Part Connections](docs/backlog.md#web-part-connections-dynamic-data) | High | SPFx Dynamic Data for cross-web-part filtering |
+| [Dynamic Filtering](docs/backlog.md#dynamic-filtering) | Medium | Combine query params + connections for live CAML filtering |
+| [Social Integration](docs/backlog.md#social-integration-likes-ratings--comments) | Medium-High | Likes, ratings, comments — partially implemented |
+| [Async Data Expansion](docs/backlog.md#async-data-expansion-helper-hbwp-expand) | High | `{{#hbwp-expand}}` for lazy/eager drill-down into related data |
+| [Extensibility Library Import](docs/backlog.md#enable-extensibility-library-import) | Medium | Load external SPFx library components (like PnP Search) |
+| [Web Component Library](docs/backlog.md#web-component-library-hbwp-components) | High | Extract `<hbwp-like-button>`, `<hbwp-star-rating>`, etc. for reuse |
+
+---
+
 ## Screenshots
 
 ### Cards Template
