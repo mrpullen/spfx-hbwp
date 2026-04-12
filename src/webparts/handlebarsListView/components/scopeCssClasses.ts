@@ -36,15 +36,17 @@ export function scopeCssClasses(template: string, wpId: string): string {
   // 2. Replace class names in <style> blocks
   let result = template.replace(styleRegex, (fullMatch: string, styleContent: string) => {
     let scoped = styleContent;
-    for (const cls of classNames) {
+    classNames.forEach((cls: string) => {
       // Replace .classname when followed by a non-identifier character (space, {, :, ., ,, etc.)
       // This avoids partial matches like .card matching inside .card-body
+      // Class names come from our own <style> blocks and are pre-escaped
+      // eslint-disable-next-line @rushstack/security/no-unsafe-regexp
       const selectorRegex = new RegExp(
         `\\.${escapeRegex(cls)}(?=[^a-zA-Z0-9_-])`,
         'g'
       );
       scoped = scoped.replace(selectorRegex, `.${cls}${suffix}`);
-    }
+    });
     return fullMatch.replace(styleContent, scoped);
   });
 
@@ -62,17 +64,15 @@ export function scopeCssClasses(template: string, wpId: string): string {
     }
 
     // Replace class names inside class="..." attributes
-    return part.replace(/\bclass\s*=\s*"([^"]*)"/gi, (_attrMatch: string, attrValue: string) => {
+    return part.replace(/\bclass\s*=\s*"([^"]*)"/gi, function(_attrMatch: string, attrValue: string) {
       let scopedAttr = attrValue;
-      for (const cls of sortedClasses) {
-        // Match whole class name (word boundary aware via splitting)
-        const attrClassRegex = new RegExp(
-          `(?<=^|\\s)${escapeRegex(cls)}(?=$|\\s)`,
-          'g'
-        );
-        scopedAttr = scopedAttr.replace(attrClassRegex, `${cls}${suffix}`);
-      }
-      return `class="${scopedAttr}"`;
+      sortedClasses.forEach(function(cls: string) {
+        // Split on whitespace, scope matching classes, rejoin
+        scopedAttr = scopedAttr.split(/\s+/).map(function(token: string) {
+          return token === cls ? cls + suffix : token;
+        }).join(' ');
+      });
+      return 'class="' + scopedAttr + '"';
     });
   }).join('');
 
