@@ -14,7 +14,12 @@ A powerful, flexible SharePoint Framework (SPFx) web part that renders SharePoin
 - 💾 **Per-Source Caching** - Individual cache timeouts stored in localStorage
 - 📝 **Form Submission** - Submit data back to SharePoint lists or HTTP endpoints
 - 👤 **User Context** - Access current user profile in templates
-- 🔄 **Token Replacement** - Use `{{userEmail}}`, `{{userId}}` in URLs
+- 🔄 **Token Replacement** - Use `{{user.email}}`, `{{page.Id}}`, `{{query.param}}` in CAML filters, URLs, and templates
+- ❤️ **Social Integration** - Interactive like/unlike toggle with optimistic UI (`{{likeButton}}` helper)
+- ⭐ **Star Ratings** - Display and submit star ratings on list items (`{{starRating}}` helper)
+- 🎨 **Auto CSS Scoping** - CSS classes in `<style>` blocks are automatically scoped per web part instance
+- 🔍 **Dynamic CAML Filters** - Filter list data using `{{page.Id}}`, `{{user.department}}`, `{{query.category}}` tokens
+- 📄 **External Templates** - Load `.hbs` template files from SharePoint document libraries
 
 ---
 
@@ -26,10 +31,10 @@ Planned features and enhancements — see [docs/backlog.md](docs/backlog.md) for
 |---|---|---|
 | [Paging Control](docs/backlog.md#paging-control) | Medium | Prev/next navigation using `renderListDataAsStream` paging tokens |
 | [Template Lookup Helpers](docs/backlog.md#template-lookup-helpers-client-side-joins) | Low | `findItem` / `findItems` for cross-list client-side joins |
-| [Query Parameter Tokens](docs/backlog.md#query-parameter-token-support) | Low | `{{query.paramName}}` in CAML filters and templates |
+| [Query Parameter Tokens](docs/backlog.md#query-parameter-token-support) | ~~Low~~ | ✅ `{{query.paramName}}` in CAML filters and templates |
 | [Web Part Connections](docs/backlog.md#web-part-connections-dynamic-data) | High | SPFx Dynamic Data for cross-web-part filtering |
 | [Dynamic Filtering](docs/backlog.md#dynamic-filtering) | Medium | Combine query params + connections for live CAML filtering |
-| [Social Integration](docs/backlog.md#social-integration-likes-ratings--comments) | Medium-High | Likes, ratings, comments — partially implemented |
+| [Social Integration](docs/backlog.md#social-integration-likes-ratings--comments) | ~~Medium-High~~ | ✅ Likes & ratings done; comments panel remaining |
 | [Async Data Expansion](docs/backlog.md#async-data-expansion-helper-hbwp-expand) | High | `{{#hbwp-expand}}` for lazy/eager drill-down into related data |
 | [Extensibility Library Import](docs/backlog.md#enable-extensibility-library-import) | Medium | Load external SPFx library components (like PnP Search) |
 | [Web Component Library](docs/backlog.md#web-component-library-hbwp-components) | High | Extract `<hbwp-like-button>`, `<hbwp-star-rating>`, etc. for reuse |
