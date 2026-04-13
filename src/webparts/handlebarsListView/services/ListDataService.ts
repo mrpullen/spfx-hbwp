@@ -24,6 +24,8 @@ export interface IListFetchConfig {
    *  Should be the inner CAML (e.g. <Eq><FieldRef Name='Status'/><Value Type='Text'>Active</Value></Eq>).
    *  Tokens like {{user.email}} or {{page.Id}} should already be resolved before passing. */
   camlFilter?: string;
+  /** Optional paging token (NextHref/PrevHref value) for requesting a specific page. */
+  pagingToken?: string;
 }
 
 /**
@@ -80,8 +82,8 @@ export class ListDataService {
   /**
    * Generates a unique cache key for a list/view/filter combination
    */
-  public getCacheKey(siteUrl: string, listId: string, viewId: string, camlFilter?: string): string {
-    const base = `${siteUrl}_${listId}_${viewId}${camlFilter ? `_${camlFilter}` : ''}`;
+  public getCacheKey(siteUrl: string, listId: string, viewId: string, camlFilter?: string, pagingToken?: string): string {
+    const base = `${siteUrl}_${listId}_${viewId}${camlFilter ? `_${camlFilter}` : ''}${pagingToken ? `_page_${pagingToken}` : ''}`;
     return `list_${btoa(base).replace(/[=+/]/g, '_')}`;
   }
 
@@ -98,7 +100,7 @@ export class ListDataService {
       return { items: [], fromCache: false, error: new Error('Missing required configuration') };
     }
 
-    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, config.camlFilter);
+    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, config.camlFilter, config.pagingToken);
 
     try {
       if (this.cacheEnabled) {
@@ -109,12 +111,12 @@ export class ListDataService {
         }
 
         // Fetch fresh data
-        const result = await this.fetchFromSharePoint(siteUrl, listId, viewId, config.camlFilter, config.viewXml);
+        const result = await this.fetchFromSharePoint(siteUrl, listId, viewId, config.camlFilter, config.viewXml, config.pagingToken);
         this.cacheService.set(cacheKey, result, effectiveTimeout);
         return result;
       } else {
         // Cache disabled, fetch directly
-        return await this.fetchFromSharePoint(siteUrl, listId, viewId, config.camlFilter, config.viewXml);
+        return await this.fetchFromSharePoint(siteUrl, listId, viewId, config.camlFilter, config.viewXml, config.pagingToken);
       }
     } catch (error) {
       console.error(`ListDataService: Error fetching list data:`, error);
@@ -240,7 +242,8 @@ export class ListDataService {
     listId: string,
     viewId: string,
     camlFilter?: string,
-    storedViewXml?: string
+    storedViewXml?: string,
+    pagingToken?: string
   ): Promise<IListDataResult> {
     try {
       // Create a context for the target site
@@ -264,11 +267,15 @@ export class ListDataService {
       }
       
       // Execute via renderListDataAsStream — returns rich lookup/person data natively
-      const response = await list.renderListDataAsStream({
+      const renderParams: any = {
         ViewXml: viewXml,
         RenderOptions: [RenderListDataOptions.ListData],
         ExpandUserField: true
-      });
+      };
+      if (pagingToken) {
+        renderParams.Paging = pagingToken;
+      }
+      const response = await list.renderListDataAsStream(renderParams);
 
       // Post-process rows to nest dot-notation lookup fields into proper objects
       const items = (response.Row || []).map((row: any) => ListDataService.nestLookupFields(row));

@@ -32,6 +32,8 @@ function resolveTokens(template: string, context: ITokenContext): string {
 interface IHandlebarsListViewState {
   html: string;
   visible: boolean;
+  pagingToken?: string;
+  pageHistory: string[];
 }
 
 /**
@@ -48,6 +50,7 @@ interface IDataEnvelope {
     firstRow?: number;
     lastRow?: number;
     rowLimit?: number;
+    pageNumber?: number;
   };
 }
 
@@ -267,6 +270,70 @@ Handlebars.registerHelper('starRating', function(rating: any) {
   );
 });
 
+/**
+ * Paging helper: renders previous/next navigation controls.
+ *
+ * Usage:  {{hbwp-paging items.paging}}
+ *         {{hbwp-paging items.paging label="Ideas"}}
+ *
+ * Renders styled prev/next buttons with data-hbwp-page attributes
+ * that the component's click delegation picks up automatically.
+ */
+Handlebars.registerHelper('hbwp-paging', function(paging: any, options: any) {
+  if (!paging) return '';
+
+  const hash = options && options.hash ? options.hash : {};
+  const label: string = hash.label || 'items';
+
+  const hasNext = !!paging.hasNext;
+  const hasPrev = !!paging.hasPrev;
+
+  // Don't render anything if there's only one page
+  if (!hasNext && !hasPrev) return '';
+
+  const pageNum = paging.pageNumber || 1;
+  const firstRow = paging.firstRow || '';
+  const lastRow = paging.lastRow || '';
+
+  // Range display: "1 – 30" or "31 – 60"
+  const rangeText = firstRow && lastRow
+    ? '<span class="hbwp-paging-range">' + Handlebars.Utils.escapeExpression(String(firstRow)) +
+      ' &ndash; ' + Handlebars.Utils.escapeExpression(String(lastRow)) +
+      ' ' + Handlebars.Utils.escapeExpression(label) + '</span>'
+    : '';
+
+  const prevBtn = '<button type="button" class="hbwp-paging-btn hbwp-paging-prev" data-hbwp-page="prev"'
+    + (hasPrev ? '' : ' disabled')
+    + ' aria-label="Previous page"'
+    + ' title="Previous page">'
+    + '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">'
+    + '<path d="M10.354 3.354L5.707 8l4.647 4.646-.708.708L4.293 8l5.353-5.354.708.708z"/>'
+    + '</svg>'
+    + '</button>';
+
+  const nextBtn = '<button type="button" class="hbwp-paging-btn hbwp-paging-next" data-hbwp-page="next"'
+    + (hasNext ? '' : ' disabled')
+    + ' aria-label="Next page"'
+    + ' title="Next page">'
+    + '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">'
+    + '<path d="M5.646 12.646L10.293 8 5.646 3.354l.708-.708L11.707 8l-5.353 5.354-.708-.708z"/>'
+    + '</svg>'
+    + '</button>';
+
+  const pageIndicator = '<span class="hbwp-paging-page">Page ' + Handlebars.Utils.escapeExpression(String(pageNum)) + '</span>';
+
+  const html = '<nav class="hbwp-paging" role="navigation" aria-label="Pagination">'
+    + '<div class="hbwp-paging-controls">'
+    + prevBtn
+    + pageIndicator
+    + nextBtn
+    + '</div>'
+    + (rangeText ? '<div class="hbwp-paging-info">' + rangeText + '</div>' : '')
+    + '</nav>';
+
+  return new Handlebars.SafeString(html);
+});
+
 /* eslint-enable dot-notation */
 
 export default class HandlebarsListView extends React.Component<IHandlebarsListViewProps, IHandlebarsListViewState> {
@@ -276,12 +343,15 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
   private formSubmitService: FormSubmitService | undefined;
   private socialDataService: SocialDataService | undefined;
   private containerRef: React.RefObject<HTMLDivElement>;
+  private lastPagingNextHref: string | undefined;
 
   constructor(props: IHandlebarsListViewProps) {
     super(props);
     this.state = {
       html: '',
-      visible: false
+      visible: false,
+      pagingToken: undefined,
+      pageHistory: []
     };
     
     this.containerRef = React.createRef();
@@ -329,6 +399,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     this.handleSocialAction = this.handleSocialAction.bind(this);
     this.handleContainerClick = this.handleContainerClick.bind(this);
     this.handleContainerSubmit = this.handleContainerSubmit.bind(this);
+    this.handlePaging = this.handlePaging.bind(this);
   }
 
 
@@ -436,6 +507,17 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       const rateValue = rateBtn.getAttribute('data-hbwp-rate-value');
       this.handleSocialAction({ action: 'rate', itemId: rateItemId || '', value: rateValue });
     }
+
+    // Paging: data-hbwp-page="next" or data-hbwp-page="prev"
+    const pageBtn = target.closest<HTMLElement>('[data-hbwp-page]');
+    if (pageBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const direction = pageBtn.getAttribute('data-hbwp-page');
+      if (direction === 'next' || direction === 'prev') {
+        this.handlePaging(direction).catch(() => { /* handled internally */ });
+      }
+    }
   }
 
   /**
@@ -523,6 +605,38 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     }
   }
 
+  /**
+   * Handles paging navigation (next/prev).
+   * Stores current token in history for back navigation, then re-fetches.
+   */
+  private async handlePaging(direction: 'next' | 'prev'): Promise<void> {
+    const nextHref = this.lastPagingNextHref;
+
+    if (direction === 'next' && nextHref) {
+      this.setState(
+        (prev) => ({
+          pageHistory: [...prev.pageHistory, prev.pagingToken || ''],
+          pagingToken: nextHref
+        }),
+        () => this.getHandlebarsTemplate()
+      );
+    } else if (direction === 'prev') {
+      if (this.state.pageHistory.length > 0) {
+        this.setState(
+          (prev) => {
+            const history = [...prev.pageHistory];
+            const prevToken = history.pop();
+            return {
+              pageHistory: history,
+              pagingToken: prevToken || undefined
+            };
+          },
+          () => this.getHandlebarsTemplate()
+        );
+      }
+    }
+  }
+
   public async componentDidUpdate(prevProps: IHandlebarsListViewProps): Promise<void> {
     // Re-render if relevant props changed
     if (
@@ -534,6 +648,15 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       JSON.stringify(prevProps.httpEndpoints) !== JSON.stringify(this.props.httpEndpoints) ||
       JSON.stringify(prevProps.submitEndpoints) !== JSON.stringify(this.props.submitEndpoints)
     ) {
+      // Reset paging when data source changes
+      if (
+        prevProps.list !== this.props.list ||
+        prevProps.view !== this.props.view ||
+        prevProps.site?.url !== this.props.site?.url
+      ) {
+        this.lastPagingNextHref = undefined;
+        this.setState({ pagingToken: undefined, pageHistory: [] });
+      }
       await this.getHandlebarsTemplate();
     }
     
@@ -618,6 +741,13 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     const primaryResult = await this.getPrimaryListData(filterTokenContext);
     const primaryEnvelope = HandlebarsListView.toEnvelope(primaryResult);
 
+    // Store paging href for the paging click handler
+    this.lastPagingNextHref = primaryResult.nextHref;
+
+    // Override hasPrev based on component's page history (more reliable than SP's prevHref)
+    primaryEnvelope.paging.hasPrev = this.state.pageHistory.length > 0;
+    primaryEnvelope.paging.pageNumber = this.state.pageHistory.length + 1;
+
     // Get additional data sources (with resolved CAML filters)
     const dataSources = await this.getAdditionalDataSources(filterTokenContext);
 
@@ -672,7 +802,8 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       listId: list,
       viewId: view,
       viewXml: viewXml || undefined,
-      camlFilter: resolvedFilter
+      camlFilter: resolvedFilter,
+      pagingToken: this.state.pagingToken
     });
   }
 
