@@ -53,6 +53,8 @@ export interface ITokenContext {
   user?: Record<string, any>;
   /** Primary list items */
   items?: Array<any>;
+  /** URL query string parameters */
+  query?: Record<string, string>;
   /** Additional data sources by key */
   [key: string]: any;
 }
@@ -420,6 +422,9 @@ export class HttpDataService {
    */
   public setCacheEnabled(enabled: boolean): void {
     this.cacheEnabled = enabled;
+    if (!enabled) {
+      this.clearAllCache();
+    }
   }
 
   /**

@@ -278,8 +278,8 @@
             onclick="document.getElementById('actions-drawer-{{wpId}}').show()"
             type="button"
             title="My Actions">
-      {{#if items.length}}
-        <span class="metro-badge-{{wpId}}">{{items.length}}</span>
+      {{#if items.rows.length}}
+        <span class="metro-badge-{{wpId}}">{{items.rows.length}}</span>
       {{/if}}
       <div class="metro-icon-{{wpId}}">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -301,12 +301,12 @@
       ✕
     </fluent-button>
     <div style="padding: 20px;">
-      {{#if items.length}}
+      {{#if items.rows.length}}
         <fluent-message-bar intent="info" style="margin-bottom: 16px;">
-          You have <strong>{{items.length}}</strong> action{{#if (gt items.length 1)}}s{{/if}} pending.
+          You have <strong>{{items.rows.length}}</strong> action{{#if (gt items.rows.length 1)}}s{{/if}} pending.
         </fluent-message-bar>
         <ul class="metro-actions-list-{{wpId}}">
-          {{#each items}}
+          {{#each items.rows}}
             <li class="metro-action-item-{{../wpId}}">
               <strong>{{Title}}</strong>
               {{#if Description}}

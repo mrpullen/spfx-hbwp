@@ -1,0 +1,90 @@
+{{!-- 
+  Idea List Template
+  ====================
+  Compact list view — each row shows the title as a link,
+  likes count, and comments count.
+  
+  Required view fields: Title, LikesCount, _CommentCount, FileRef
+  Required expandFields: ["LikedBy"]
+--}}
+
+<style>
+  .idea-list-container {
+    font-family: var(--body-font, 'Segoe UI', sans-serif);
+    padding: 16px;
+  }
+
+  .idea-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .idea-row {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 4px;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.15s ease;
+  }
+
+  .idea-row:hover {
+    background: var(--ms-semanticColors-listItemBackgroundHovered, #f3f2f1);
+  }
+
+  .idea-row-title {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ms-palette-neutralPrimary, #323130);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .idea-row-stats {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--ms-palette-neutralSecondary, #605e5c);
+    flex-shrink: 0;
+    margin-left: 12px;
+  }
+
+  .idea-row-stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  .idea-list-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #605e5c;
+  }
+</style>
+
+<div class="idea-list-container">
+  {{#if items.rows.length}}
+    <div class="idea-list">
+      {{#each items.rows}}
+        <a href="{{FileRef}}" class="idea-row">
+          <span class="idea-row-title">{{Title}}</span>
+          <div class="idea-row-stats">
+            <span class="idea-row-stat">♥ {{LikesCount}}</span>
+            <span class="idea-row-stat">💬 {{_CommentCount}}</span>
+          </div>
+        </a>
+      {{/each}}
+    </div>
+  {{else}}
+    <div class="idea-list-empty">
+      <p style="font-size: 14px;">No ideas yet</p>
+    </div>
+  {{/if}}
+</div>

@@ -164,12 +164,12 @@
       </fluent-accordion-item>
       <fluent-accordion-item>
         <span slot="heading">
-          <strong>Your List Items ({{items.length}} items)</strong>
+          <strong>Your List Items ({{items.rows.length}} items)</strong>
         </span>
         <div style="padding: 12px;">
-          {{#if items.length}}
+          {{#if items.rows.length}}
             <ul>
-              {{#each items}}
+              {{#each items.rows}}
                 <li>{{Title}}</li>
               {{/each}}
             </ul>
@@ -204,8 +204,8 @@
       <fluent-tab-panel id="panel-items-{{wpId}}">
         <div style="padding: 16px;">
           <h3>Items from Primary List</h3>
-          {{#if items.length}}
-            {{#each items}}
+          {{#if items.rows.length}}
+            {{#each items.rows}}
               <fluent-card style="padding: 12px; margin: 8px 0;">
                 <strong>{{Title}}</strong>
                 {{#if Description}}<p>{{Description}}</p>{{/if}}
@@ -236,9 +236,9 @@
           <h3>Template Help</h3>
           <p>Use Handlebars syntax to access your data:</p>
           <ul>
-            <li><code>\{{#each items}}</code> - Loop through list items</li>
+            <li><code>\{{#each items.rows}}</code> - Loop through list items</li>
             <li><code>\{{user.displayName}}</code> - Current user's name</li>
-            <li><code>\{{#each announcements}}</code> - Additional data sources (by key name)</li>
+            <li><code>\{{#each announcements.rows}}</code> - Additional data sources (by key name)</li>
           </ul>
         </div>
       </fluent-tab-panel>
@@ -527,9 +527,9 @@
         <fluent-card style="padding: 16px;">
           <p style="margin: 0;"><strong>Description:</strong></p>
           <p>This drawer can display detailed information about a selected item from your list.</p>
-          {{#if items.length}}
+          {{#if items.rows.length}}
             <fluent-divider style="margin: 12px 0;"></fluent-divider>
-            <p><strong>First item title:</strong> {{items.[0].Title}}</p>
+            <p><strong>First item title:</strong> {{items.rows.[0].Title}}</p>
           {{/if}}
         </fluent-card>
       </div>
@@ -637,14 +637,14 @@
   {{!-- ==================== DATA GRID ==================== --}}
   <div class="component-section">
     <h2>📊 Data Grid (Your List Items)</h2>
-    {{#if items.length}}
+    {{#if items.rows.length}}
     <fluent-data-grid aria-label="List Items" style="min-width: 100%;">
       <fluent-data-grid-row row-type="header">
         <fluent-data-grid-cell cell-type="columnheader" grid-column="1">Title</fluent-data-grid-cell>
         <fluent-data-grid-cell cell-type="columnheader" grid-column="2">ID</fluent-data-grid-cell>
         <fluent-data-grid-cell cell-type="columnheader" grid-column="3">Actions</fluent-data-grid-cell>
       </fluent-data-grid-row>
-      {{#each items}}
+      {{#each items.rows}}
       <fluent-data-grid-row>
         <fluent-data-grid-cell grid-column="1">{{Title}}</fluent-data-grid-cell>
         <fluent-data-grid-cell grid-column="2">
@@ -753,7 +753,7 @@
       <fluent-counter-badge count="5">
         <fluent-button appearance="subtle" icon-only>📧</fluent-button>
       </fluent-counter-badge>
-      <fluent-counter-badge count="{{items.length}}" color="brand">
+      <fluent-counter-badge count="{{items.rows.length}}" color="brand">
         <fluent-button appearance="subtle" icon-only>📋</fluent-button>
       </fluent-counter-badge>
       <fluent-counter-badge count="99" overflow-count="99" color="danger">
@@ -775,14 +775,14 @@
         <div style="padding: 12px;">
           <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
             <tr style="background: #f0f0f0;"><th style="padding: 8px; text-align: left;">Variable</th><th style="padding: 8px; text-align: left;">Description</th></tr>
-            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><code>\{{#each items}}</code></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Loop through primary list items</td></tr>
-            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><code>\{{items.length}}</code></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Number of items</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><code>\{{#each items.rows}}</code></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Loop through primary list items</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><code>\{{items.rows.length}}</code></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Number of items</td></tr>
             <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><code>\{{user.displayName}}</code></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Current user's name</td></tr>
             <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><code>\{{user.email}}</code></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Current user's email</td></tr>
             <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><code>\{{user.jobTitle}}</code></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Current user's job title</td></tr>
             <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><code>\{{user.department}}</code></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Current user's department</td></tr>
             <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><code>\{{user.pictureUrl}}</code></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Current user's profile picture</td></tr>
-            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><code>\{{#each keyName}}</code></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Additional data source by key (e.g., announcements)</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><code>\{{#each keyName.rows}}</code></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Additional data source by key (e.g., announcements)</td></tr>
             <tr><td style="padding: 8px;"><code>\{{wpId}}</code></td><td style="padding: 8px;">Web part instance ID (for unique element IDs)</td></tr>
           </table>
         </div>

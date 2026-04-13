@@ -104,12 +104,12 @@
   {{!-- Header --}}
   <div class="card-grid-header-{{wpId}}">
     <h2 class="card-grid-title-{{wpId}}">{{#if title}}{{title}}{{else}}Items{{/if}}</h2>
-    <fluent-badge appearance="filled" color="brand">{{items.length}} items</fluent-badge>
+    <fluent-badge appearance="filled" color="brand">{{items.rows.length}} items</fluent-badge>
   </div>
 
-  {{#if items.length}}
+  {{#if items.rows.length}}
     <div class="card-grid-{{wpId}}">
-      {{#each items}}
+      {{#each items.rows}}
         <fluent-card class="item-card-{{../wpId}}">
           {{!-- Optional colored header - uncomment if you want it
           <div class="card-header-{{../wpId}}">

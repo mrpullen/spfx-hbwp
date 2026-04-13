@@ -81,10 +81,10 @@
 </style>
 
 <div class="carousel-wrapper-{{wpId}}">
-  {{#if items.length}}
+  {{#if items.rows.length}}
     <fluentui-carousel autoplay="true" autoplay-interval="5000" loop="true"
       aria-label="Item carousel">
-      {{#each items}}
+      {{#each items.rows}}
         <div class="carousel-slide-{{../wpId}}">
           <fluent-card>
             <h3 class="carousel-slide-title-{{../wpId}}">{{Title}}</h3>
