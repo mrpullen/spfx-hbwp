@@ -1,0 +1,239 @@
+{{!-- 
+  Idea Cards Template
+  ====================
+  Displays ideas as cards with title, description, likes count,
+  and author persona with email/chat links.
+  
+  CSS classes in <style> blocks are automatically scoped with the
+  web part instance ID — no need to add {{wpId}} manually.
+  
+  Required view fields: Title, Description, LikesCount, FileRef
+  Required expandFields: ["Editor", "LikedBy"]
+  
+  Available Data:
+  - items: List data with rows from configured view
+  - user: Current user profile
+  - wpId: Web part instance ID
+  - siteUrl: The configured site URL
+--}}
+
+<style>
+  .idea-container {
+    font-family: var(--body-font, 'Segoe UI', sans-serif);
+    padding: 16px;
+  }
+
+  .idea-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+  }
+
+  .idea-card {
+    padding: 0;
+    overflow: hidden;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    border-radius: 8px;
+  }
+
+  .idea-card:hover {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
+  }
+
+  .idea-card-body {
+    padding: 20px;
+  }
+
+  .idea-title {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .idea-title a {
+    color: #323130;
+    text-decoration: none;
+  }
+
+  .idea-title a:hover {
+    color: #0078d4;
+    text-decoration: underline;
+  }
+
+  .idea-desc {
+    margin: 0 0 16px 0;
+    font-size: 14px;
+    color: #605e5c;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .idea-desc a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .idea-desc a:hover {
+    color: #0078d4;
+  }
+
+  .idea-stats {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #edebe9;
+  }
+
+  .idea-likes {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    color: #605e5c;
+    text-decoration: none;
+    background: none;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .idea-likes:hover {
+    background: #f3f2f1;
+  }
+
+  .idea-likes .heart {
+    font-size: 18px;
+    transition: transform 0.15s ease;
+  }
+
+  .idea-likes .heart-liked {
+    color: #d13438;
+  }
+
+  .idea-likes .heart-not-liked {
+    color: #c8c6c4;
+  }
+
+  .idea-likes:hover .heart {
+    transform: scale(1.15);
+  }
+
+  .idea-persona {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .persona-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .persona-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #323130;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .persona-name:hover {
+    color: #0078d4;
+    text-decoration: underline;
+  }
+
+  .persona-actions {
+    display: flex;
+    gap: 10px;
+    font-size: 12px;
+  }
+
+  .persona-actions a {
+    color: #0078d4;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .persona-actions a:hover {
+    text-decoration: underline;
+  }
+
+  .idea-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: #605e5c;
+  }
+</style>
+
+<div class="idea-container">
+  {{#if items.rows.length}}
+    <div class="idea-grid">
+      {{#each items.rows}}
+        <fluent-card class="idea-card">
+          <div class="idea-card-body">
+
+            {{!-- Title linked to page --}}
+            <h3 class="idea-title">
+              <a href="{{FileRef}}">{{Title}}</a>
+            </h3>
+
+            {{!-- Description linked to page --}}
+            {{#if Description}}
+              <div class="idea-desc">
+                <a href="{{FileRef}}">{{Description}}</a>
+              </div>
+            {{/if}}
+
+            {{!-- Likes row (interactive — click to toggle like) --}}
+            <div class="idea-stats">
+              {{likeButton ID LikesCount LikedBy ../user.id color="#e3008c"}}
+              <div style="font-size: 14px; color: #605e5c;">{{_CommentCount}} {{#is _CommentCount "1"}}comment{{else}}comments{{/is}}</div>
+            </div>
+
+            {{!-- Author Persona --}}
+            {{#each Emp}}
+              {{#if @first}}
+                <div class="idea-persona">
+                  <img
+                    alt="{{Title}}"
+                    src="/_layouts/15/userphoto.aspx?size=M&amp;username={{Email}}"
+                    style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover;"/>
+                  
+                  <div class="persona-details">
+                    <a href="mailto:{{Email}}" class="persona-name">{{Title}}</a>
+                    <div class="persona-actions">
+                      <a href="mailto:{{Email}}" title="Send email">✉ Email</a>
+                      <a href="sip:{{Sip}}" title="Start chat">💬 Chat</a>
+                    </div>
+                  </div>
+                </div>
+              {{/if}}
+            {{/each}}
+
+          </div>
+        </fluent-card>
+      {{/each}}
+    </div>
+  {{else}}
+    <div class="idea-empty">
+      <div style="font-size: 48px; margin-bottom: 12px;">💡</div>
+      <p style="font-size: 16px; font-weight: 600;">No ideas yet</p>
+      <p>Ideas will appear here once they are created.</p>
+    </div>
+  {{/if}}
+</div>

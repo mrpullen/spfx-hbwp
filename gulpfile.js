@@ -28,6 +28,10 @@ build.addSuppression(
   `Critical dependency: *`
 );
 
+build.addSuppression(
+  /Warning - lint - .*no-explicit-any/
+);
+
 var getTasks = build.rig.getTasks;
 build.rig.getTasks = function () {
   var result = getTasks.call(build.rig);

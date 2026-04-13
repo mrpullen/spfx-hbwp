@@ -276,13 +276,13 @@
     <p>Share your opinion and see what others think</p>
   </div>
   
-  {{#if items}}
-    {{#each items}}
+  {{#if items.rows}}
+    {{#each items.rows}}
       {{!-- Parse options into an array --}}
       {{#with (split this.Options "|") as |optionsArray|}}
         
         {{!-- Find if current user has already voted on this question --}}
-        {{#with (lookup @root "responses") as |allResponses|}}
+        {{#with @root.responses.rows as |allResponses|}}
           {{#with (filter allResponses "QuestionId" ../ID) as |questionResponses|}}
             {{#with (filter questionResponses "RespondentEmail" @root.userProfile.Email) as |myResponses|}}
               {{#with (first myResponses) as |myVote|}}

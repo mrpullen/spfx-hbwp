@@ -21,10 +21,16 @@ import HandlebarsListView from './components/HandlebarsListView';
 import { IListDataSource, IHttpEndpointDataSource, IQueryParameter, ISubmitEndpoint, HttpAuthType, SubmitEndpointType } from './components/IHandlebarsListViewProps';
 import { PropertyFieldSitePicker, PropertyFieldListPicker, PropertyFieldListPickerOrderBy, IPropertyFieldSite } from '@pnp/spfx-property-controls';
 import { PropertyFieldViewPicker, PropertyFieldViewPickerOrderBy } from '@pnp/spfx-property-controls/lib/PropertyFieldViewPicker';
+
 import { PropertyFieldCodeEditor, PropertyFieldCodeEditorLanguages } from '@pnp/spfx-property-controls/lib/PropertyFieldCodeEditor';
 import { PropertyFieldFilePicker, IFilePickerResult } from '@pnp/spfx-property-controls/lib/PropertyFieldFilePicker';
 import { spfi, SPFI, SPFx } from '@pnp/sp';
 import "@pnp/sp/files";
+import "@pnp/sp/webs";
+import "@pnp/sp/lists";
+import "@pnp/sp/views";
+import "@pnp/sp/items";
+import { AssignFrom } from "@pnp/core";
 import { LogLevel, PnPLogging } from "@pnp/logging";
 import { allComponents, provideFluentDesignSystem } from '@fluentui/web-components';
 import { Carousel } from '@mrpullen/fluentui-carousel';
@@ -69,6 +75,98 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
   private pageData?: Record<string, any> = undefined;
   private pageDataService?: PageDataService = undefined;
   private resolvedTemplate: string = '';
+  private camlValidationResult: string = '';
+
+  /**
+   * Extracts the <Where> clause from ViewXml, returning the ViewXml without it
+   * and the extracted Where content separately.
+   */
+  private static extractWhereFromViewXml(viewXml: string): { viewXmlWithoutWhere: string; whereClause: string } {
+    const whereMatch = viewXml.match(/<Where>([\s\S]*?)<\/Where>/i);
+    if (whereMatch) {
+      const whereClause = whereMatch[1].trim();
+      const viewXmlWithoutWhere = viewXml.replace(/<Where>[\s\S]*?<\/Where>/i, '');
+      return { viewXmlWithoutWhere, whereClause };
+    }
+    return { viewXmlWithoutWhere: viewXml, whereClause: '' };
+  }
+
+  /**
+   * Fetches the ViewXml for a given view and stores it along with the extracted CAML filter
+   */
+  private async fetchAndStoreViewXml(siteUrl: string, listId: string, viewId: string, viewXmlProp: string, camlFilterProp: string): Promise<void> {
+    if (!this.sp || !siteUrl || !listId || !viewId) return;
+    try {
+      const spSite = spfi(siteUrl).using(AssignFrom(this.sp.web));
+      const view = await spSite.web.lists.getById(listId).views.getById(viewId).select('ListViewXml')();
+      const { viewXmlWithoutWhere, whereClause } = HandlebarsListViewWebPart.extractWhereFromViewXml(view.ListViewXml);
+      this.properties[viewXmlProp] = viewXmlWithoutWhere;
+      this.properties[camlFilterProp] = whereClause;
+      this.context.propertyPane.refresh();
+      this.render();
+    } catch (error) {
+      console.error('Error fetching ViewXml:', error);
+    }
+  }
+
+  protected onPropertyPaneFieldChanged(propertyPath: string, oldValue: any, newValue: any): void {
+    super.onPropertyPaneFieldChanged(propertyPath, oldValue, newValue);
+
+    // Primary view changed
+    if (propertyPath === 'view' && newValue && newValue !== oldValue) {
+      const siteUrl = this.properties.sites?.[0]?.url;
+      if (siteUrl && this.properties.list) {
+        this.fetchAndStoreViewXml(siteUrl, this.properties.list, newValue, 'viewXml', 'camlFilter')
+          .catch(err => console.error('Error fetching view XML:', err));
+      }
+    }
+
+    // Data source view changed (ds0View, ds1View, etc.)
+    const dsViewMatch = propertyPath.match(/^ds(\d+)View$/);
+    if (dsViewMatch && newValue && newValue !== oldValue) {
+      const i = dsViewMatch[1];
+      const sites = this.properties[`ds${i}Sites`] as Array<IPropertyFieldSite>;
+      const siteUrl = sites?.[0]?.url;
+      const listId = this.properties[`ds${i}List`] as string;
+      if (siteUrl && listId) {
+        this.fetchAndStoreViewXml(siteUrl, listId, newValue, `ds${i}ViewXml`, `ds${i}CamlFilter`)
+          .catch(err => console.error(`Error fetching view XML for ds${i}:`, err));
+      }
+    }
+  }
+
+  /**
+   * Validates the CAML query by executing it and returning the item count
+   */
+  private async validateCamlQuery(siteUrl: string, listId: string, viewXml: string, camlFilter: string, labelProp: string): Promise<void> {
+    if (!this.sp || !siteUrl || !listId) {
+      this.camlValidationResult = 'Error: Missing site, list, or view configuration.';
+      this.context.propertyPane.refresh();
+      return;
+    }
+    try {
+      this.camlValidationResult = 'Validating...';
+      this.context.propertyPane.refresh();
+
+      let finalXml = viewXml || '<View><Query></Query></View>';
+      if (camlFilter && camlFilter.trim()) {
+        // Inject the Where clause
+        const hasQuery = /<Query>/i.test(finalXml);
+        if (hasQuery) {
+          finalXml = finalXml.replace(/<Query>/i, `<Query><Where>${camlFilter}</Where>`);
+        } else {
+          finalXml = finalXml.replace(/<\/View>/i, `<Query><Where>${camlFilter}</Where></Query></View>`);
+        }
+      }
+
+      const spSite = spfi(siteUrl).using(AssignFrom(this.sp.web));
+      const items = await spSite.web.lists.getById(listId).getItemsByCAMLQuery({ ViewXml: finalXml });
+      this.camlValidationResult = `✓ Valid — ${items.length} item(s) returned`;
+    } catch (error: any) {
+      this.camlValidationResult = `✗ Error: ${error.message || error}`;
+    }
+    this.context.propertyPane.refresh();
+  }
 
   protected async onInit(): Promise<void> {
     this.sp = spfi().using(SPFx(this.context)).using(PnPLogging(LogLevel.Warning));
@@ -131,31 +229,54 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
   }
 
   /**
-   * Loads template content from a SharePoint file if configured
+   * Loads template content from a SharePoint file if configured.
+   * Uses PnPjs REST API to get raw file content (works for any extension including .hbs).
+   * Falls back to direct fetch, then to inline template.
    */
   private async loadTemplateFromFile(): Promise<void> {
     const templateFile = this.properties.templateFile;
     
     if (templateFile && templateFile.fileAbsoluteUrl) {
+      const fileUrl = templateFile.fileAbsoluteUrl;
+      console.log(`[HBWP Template] Loading template from file: ${fileUrl}`);
+      console.log(`[HBWP Template] File name: ${templateFile.fileName || '(unknown)'}`);
+      
       try {
-        // Use fetch to get the file content
-        const response = await fetch(templateFile.fileAbsoluteUrl, {
-          headers: {
-            'Accept': 'text/plain'
-          }
-        });
+        // Extract server-relative path from the absolute URL
+        const url = new URL(fileUrl);
+        const serverRelativePath = decodeURIComponent(url.pathname);
+        console.log(`[HBWP Template] Server-relative path: ${serverRelativePath}`);
+
+        // Use PnPjs to get file content via REST API — works for any extension
+        if (!this.sp) {
+          throw new Error('PnPjs not initialized');
+        }
+        const fileContent = await this.sp.web.getFileByServerRelativePath(serverRelativePath).getText();
         
-        if (response.ok) {
-          this.resolvedTemplate = await response.text();
+        if (fileContent && fileContent.trim().length > 0) {
+          // Sanity check: if it looks like an HTML page wrapper instead of a template, warn
+          const isHtmlPage = fileContent.trim().toLowerCase().startsWith('<!doctype') || 
+                             fileContent.trim().toLowerCase().startsWith('<html');
+          if (isHtmlPage) {
+            console.warn(`[HBWP Template] WARNING: File content appears to be a full HTML page, not a Handlebars template. ` +
+              `This may indicate SharePoint returned a preview page instead of raw file content.`);
+            console.warn(`[HBWP Template] First 200 chars: ${fileContent.substring(0, 200)}`);
+          } else {
+            console.log(`[HBWP Template] Successfully loaded template (${fileContent.length} chars)`);
+            console.log(`[HBWP Template] First 100 chars: ${fileContent.substring(0, 100)}`);
+          }
+          this.resolvedTemplate = fileContent;
         } else {
-          console.error('Failed to load template file:', response.statusText);
+          console.warn(`[HBWP Template] File returned empty content. Falling back to inline template.`);
           this.resolvedTemplate = this.properties.template || '';
         }
       } catch (error) {
-        console.error('Error loading template from file:', error);
+        console.error(`[HBWP Template] Error loading template via PnPjs REST API:`, error);
+        console.log(`[HBWP Template] Falling back to inline template.`);
         this.resolvedTemplate = this.properties.template || '';
       }
     } else {
+      console.log(`[HBWP Template] No template file configured. Using inline template.`);
       this.resolvedTemplate = this.properties.template || '';
     }
   }
@@ -165,9 +286,12 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
    */
   private getEffectiveTemplate(): string {
     if (this.properties.templateFile && this.properties.templateFile.fileAbsoluteUrl && this.resolvedTemplate) {
+      console.log(`[HBWP Template] Using file template (${this.resolvedTemplate.length} chars) from: ${this.properties.templateFile.fileAbsoluteUrl}`);
       return this.resolvedTemplate;
     }
-    return this.properties.template || '';
+    const inline = this.properties.template || '';
+    console.log(`[HBWP Template] Using inline template (${inline.length} chars)`);
+    return inline;
   }
 
   private addDataSource(): void {
@@ -183,6 +307,8 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
       delete this.properties[`ds${index}Sites`];
       delete this.properties[`ds${index}List`];
       delete this.properties[`ds${index}View`];
+      delete this.properties[`ds${index}ViewXml`];
+      delete this.properties[`ds${index}CamlFilter`];
       this.properties.dataSourceCount--;
       this.context.propertyPane.refresh();
       this.render();
@@ -307,6 +433,8 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
       const listId = this.properties[`ds${i}List`] as string;
       const viewId = this.properties[`ds${i}View`] as string;
       const cacheTimeoutMinutes = this.properties[`ds${i}CacheTimeout`] as number;
+      const camlFilter = this.properties[`ds${i}CamlFilter`] as string;
+      const viewXml = this.properties[`ds${i}ViewXml`] as string;
       
       if (key && sites && sites.length > 0 && listId && viewId) {
         dataSources.push({
@@ -314,6 +442,8 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
           site: sites[0],
           listId,
           viewId,
+          viewXml: viewXml || undefined,
+          camlFilter: camlFilter || undefined,
           cacheTimeoutMinutes
         });
       }
@@ -339,6 +469,8 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
         site: this.properties.sites[0],
         list: this.properties.list,
         view: this.properties.view,
+        viewXml: this.properties.viewXml,
+        camlFilter: this.properties.camlFilter,
         dataSources: dataSources,
         httpEndpoints: httpEndpoints,
         submitEndpoints: submitEndpoints,
@@ -451,6 +583,52 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
                   context: this.context as any,
                   deferredValidationTime: 0,
                   key: 'viewPickerFieldId'
+                }),
+                PropertyFieldCodeEditor('viewXml', {
+                  label: 'View XML',
+                  panelTitle: 'View XML',
+                  initialValue: this.properties.viewXml || '',
+                  onPropertyChange: this.onPropertyPaneFieldChanged.bind(this),
+                  properties: this.properties,
+                  disabled: !this.properties.view,
+                  key: 'viewXmlEditorFieldId',
+                  language: PropertyFieldCodeEditorLanguages.XML,
+                  options: {
+                    wrap: true,
+                    fontSize: 12
+                  }
+                }),
+                PropertyFieldCodeEditor('camlFilter', {
+                  label: 'CAML Where Filter (optional)',
+                  panelTitle: 'CAML Where Filter',
+                  initialValue: this.properties.camlFilter || '',
+                  onPropertyChange: this.onPropertyPaneFieldChanged.bind(this),
+                  properties: this.properties,
+                  disabled: !this.properties.view,
+                  key: 'camlFilterEditorFieldId',
+                  language: PropertyFieldCodeEditorLanguages.XML,
+                  options: {
+                    wrap: true,
+                    fontSize: 12
+                  }
+                }),
+                PropertyPaneLabel('camlFilterHelp', {
+                  text: 'Supports tokens: {{user.email}}, {{page.Id}}, etc. Example: <Eq><FieldRef Name="Status"/><Value Type="Text">Active</Value></Eq>'
+                }),
+                PropertyPaneButton('validateCaml', {
+                  text: 'Validate CAML Query',
+                  buttonType: PropertyPaneButtonType.Normal,
+                  onClick: () => {
+                    const siteUrl = this.properties.sites?.[0]?.url;
+                    if (siteUrl && this.properties.list) {
+                      this.validateCamlQuery(siteUrl, this.properties.list, this.properties.viewXml || '', this.properties.camlFilter || '', 'camlValidationResult')
+                        .catch(err => console.error('Validation error:', err));
+                    }
+                  },
+                  disabled: !this.properties.list
+                }),
+                PropertyPaneLabel('camlValidationResult', {
+                  text: this.camlValidationResult || ''
                 })
               ]
             }, 
@@ -559,7 +737,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
                   disabled: (this.properties.dataSourceCount || 0) === 0
                 }),
                 PropertyPaneLabel('dataSourcesHelp', {
-                  text: 'Access in template: {{#each keyName}}...{{/each}}. Primary list: {{#each items}}...{{/each}}. User: {{user.displayName}}'
+                  text: 'Access in template: {{#each keyName}}...{{/each}}. Primary list: {{#each items}}...{{/each}}. User: {{user.displayName}}. Page: {{page.Title}}. CAML filters support {{user.*}} and {{page.*}} tokens.'
                 })
               ]
             },
@@ -687,6 +865,17 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
             deferredValidationTime: 0,
             key: `ds${i}ViewFieldId`
           }),
+          PropertyFieldCodeEditor(`ds${i}ViewXml`, {
+            label: 'View XML',
+            panelTitle: `Data Source ${i + 1} View XML`,
+            initialValue: this.properties[`ds${i}ViewXml`] || '',
+            onPropertyChange: this.onPropertyPaneFieldChanged.bind(this),
+            properties: this.properties,
+            disabled: !this.properties[`ds${i}View`],
+            key: `ds${i}ViewXmlEditorFieldId`,
+            language: PropertyFieldCodeEditorLanguages.XML,
+            options: { wrap: true, fontSize: 12 }
+          }),
           PropertyPaneSlider(`ds${i}CacheTimeout`, {
             label: 'Cache Timeout (minutes)',
             min: 1,
@@ -694,7 +883,25 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
             step: 1,
             showValue: true,
             value: this.properties[`ds${i}CacheTimeout`] ?? 15
-          })
+          }),
+          PropertyPaneTextField(`ds${i}CamlFilter`, {
+            label: 'CAML Filter (optional)',
+            description: 'Additional CAML Where clause. Supports tokens: {{user.email}}, {{page.Id}}',
+            multiline: true,
+            rows: 3,
+            value: this.properties[`ds${i}CamlFilter`] || ''
+          }),
+          PropertyPaneButton(`ds${i}ValidateCaml`, {
+            text: 'Validate CAML Query',
+            buttonType: PropertyPaneButtonType.Normal,
+            onClick: () => {
+              if (siteUrl && listId) {
+                this.validateCamlQuery(siteUrl, listId, this.properties[`ds${i}ViewXml`] || '', this.properties[`ds${i}CamlFilter`] || '', `ds${i}CamlValidationResult`)
+                  .catch(err => console.error(`Validation error for ds${i}:`, err));
+              }
+            },
+            disabled: !listId
+          }),
         ]
       });
     }
