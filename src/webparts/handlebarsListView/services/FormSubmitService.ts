@@ -7,6 +7,9 @@ import "@pnp/sp/items";
 import { AadHttpClient, AadHttpClientFactory, HttpClient, HttpClientResponse, IHttpClientOptions } from '@microsoft/sp-http';
 import { ISubmitEndpoint } from '../components/IHandlebarsListViewProps';
 
+/** Azure AD resource URI used to acquire tokens for Power Automate HTTP-triggered flows */
+const FLOW_RESOURCE_URI = 'https://service.flow.microsoft.com/';
+
 /**
  * Result of a form submission
  */
@@ -163,6 +166,14 @@ export class FormSubmitService {
     if (authType === 'aad' && config.appId) {
       // Use AAD HTTP Client
       const client = await this.getAadClient(config.appId);
+      response = await client.fetch(url, AadHttpClient.configurations.v1, {
+        method,
+        headers,
+        body
+      });
+    } else if (authType === 'flow') {
+      // Use AAD HTTP Client against the Power Automate resource URI
+      const client = await this.getAadClient(FLOW_RESOURCE_URI);
       response = await client.fetch(url, AadHttpClient.configurations.v1, {
         method,
         headers,

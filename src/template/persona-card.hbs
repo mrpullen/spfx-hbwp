@@ -1,0 +1,244 @@
+{{!-- 
+  Persona Card Template
+  =====================
+  Displays people from the User Information List as persona cards.
+  Circular profile image over gradient banner, star rating, name,
+  department, job title, email/chat links.
+
+  Data source: User Information List (hidden list)
+  Fields used: Title, EMail, Picture.Value, Department, JobTitle, ID
+  Paging: uses {{hbwp-paging}} helper
+--}}
+
+<style>
+  .persona-container {
+    font-family: var(--body-font, 'Segoe UI', sans-serif);
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+
+  .persona-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px;
+    flex: 1 1 auto;
+    align-content: start;
+  }
+
+  .persona-card {
+    border-radius: 12px;
+    overflow: hidden;
+    text-align: center;
+    padding: 0;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+
+  .persona-card:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+    transform: translateY(-2px);
+  }
+
+  /* Gradient banner */
+  .persona-banner {
+    position: relative;
+    height: 100px;
+    background: linear-gradient(180deg, var(--accent-base-color, #0078d4) 0%, transparent 100%);
+  }
+
+  /* Circular avatar */
+  .persona-avatar-wrap {
+    position: absolute;
+    bottom: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    background: #e0e0e0;
+  }
+
+  .persona-avatar-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .persona-initials {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 600;
+    color: #ffffff;
+    background: var(--accent-base-color, #0078d4);
+  }
+
+  /* Body */
+  .persona-body {
+    padding: 48px 16px 16px;
+  }
+
+  /* Star rating */
+  .persona-stars {
+    display: flex;
+    justify-content: center;
+    gap: 1px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  .persona-star-filled {
+    color: #ffb900;
+  }
+
+  .persona-star-empty {
+    color: #d2d0ce;
+  }
+
+  /* Name */
+  .persona-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: #323130;
+    margin: 0 0 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Department badge */
+  .persona-dept {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent-base-color, #0078d4);
+    background: #f3f2f1;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-bottom: 4px;
+  }
+
+  /* Job title */
+  .persona-job {
+    font-size: 12px;
+    color: #a19f9d;
+    margin: 0 0 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Contact links */
+  .persona-links {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .persona-links a {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--accent-base-color, #0078d4);
+    text-decoration: none;
+    padding: 3px 10px;
+    border-radius: 14px;
+    background: #f3f2f1;
+    transition: background 0.15s ease;
+  }
+
+  .persona-links a:hover {
+    background: #e1dfdd;
+  }
+
+  /* Empty state */
+  .persona-empty {
+    text-align: center;
+    padding: 60px 20px;
+    grid-column: 1 / -1;
+    color: #605e5c;
+  }
+
+  /* Paging footer */
+  .persona-paging {
+    flex: 0 0 auto;
+    padding-top: 16px;
+  }
+</style>
+
+<div class="persona-container" data-wpid="{{wpId}}">
+
+{{#if items.rows.length}}
+  <div class="persona-grid">
+    {{#each items.rows}}
+      <fluent-card class="persona-card">
+
+        {{!-- Banner + avatar --}}
+        <div class="persona-banner">
+          <div class="persona-avatar-wrap">
+            {{#if Picture.Value}}
+              <img src="{{Picture.Value}}" alt="{{Title}}" />
+            {{else}}
+              <span class="persona-initials">{{substring Title 0 1}}</span>
+            {{/if}}
+          </div>
+        </div>
+
+        <div class="persona-body">
+
+          {{!-- Random star rating 1-5 (seeded from ID for consistency) --}}
+          <div class="persona-stars">
+            {{starRating (add (mod (toInt ID) 5) 1)}}
+          </div>
+
+          {{!-- Name --}}
+          <h3 class="persona-name" title="{{Title}}">{{Title}}</h3>
+
+          {{!-- Department --}}
+          {{#if Department}}
+            <span class="persona-dept">{{Department}}</span>
+          {{/if}}
+
+          {{!-- Job title --}}
+          {{#if JobTitle}}
+            <p class="persona-job" title="{{JobTitle}}">{{JobTitle}}</p>
+          {{/if}}
+
+          {{!-- Email & Chat --}}
+          {{#if EMail}}
+            <div class="persona-links">
+              <a href="mailto:{{EMail}}" title="Send email">&#9993; Email</a>
+              <a href="https://teams.microsoft.com/l/chat/0/0?users={{EMail}}" target="_blank" title="Chat in Teams">&#128172; Chat</a>
+            </div>
+          {{/if}}
+
+        </div>
+
+      </fluent-card>
+    {{/each}}
+  </div>
+
+  {{!-- Paging --}}
+  <div class="persona-paging">
+    {{hbwp-paging items.paging label="people"}}
+  </div>
+
+{{else}}
+  <div class="persona-empty">
+    <p style="font-size: 32px; margin-bottom: 8px;">&#128100;</p>
+    <p>No people found.</p>
+  </div>
+{{/if}}
+
+</div>

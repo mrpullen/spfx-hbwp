@@ -37,7 +37,7 @@ export interface IQueryParameter {
 /**
  * Authentication type for HTTP endpoints
  */
-export type HttpAuthType = 'aad' | 'anonymous' | 'apiKey' | 'bearer';
+export type HttpAuthType = 'aad' | 'anonymous' | 'apiKey' | 'bearer' | 'flow';
 
 /**
  * HTTP endpoint configuration for API calls with multiple auth options

@@ -100,22 +100,26 @@ export class ListDataService {
       return { items: [], fromCache: false, error: new Error('Missing required configuration') };
     }
 
+    // Bypass cache entirely for paged requests — only cache page 1.
+    // Paged data is sequential/ephemeral; caching individual pages causes stale hits.
+    const isPaged = !!config.pagingToken;
+
     const cacheKey = this.getCacheKey(siteUrl, listId, viewId, config.camlFilter, config.pagingToken);
 
     try {
-      if (this.cacheEnabled) {
-        // Check if we have cached data first
+      if (this.cacheEnabled && !isPaged) {
+        // Check if we have cached data first (page 1 only)
         const cachedResult = this.cacheService.get<IListDataResult>(cacheKey);
         if (cachedResult !== undefined) {
           return { ...cachedResult, fromCache: true };
         }
 
-        // Fetch fresh data
+        // Fetch fresh data and cache it
         const result = await this.fetchFromSharePoint(siteUrl, listId, viewId, config.camlFilter, config.viewXml, config.pagingToken);
         this.cacheService.set(cacheKey, result, effectiveTimeout);
         return result;
       } else {
-        // Cache disabled, fetch directly
+        // Cache disabled or paged request — fetch directly
         return await this.fetchFromSharePoint(siteUrl, listId, viewId, config.camlFilter, config.viewXml, config.pagingToken);
       }
     } catch (error) {
@@ -272,10 +276,19 @@ export class ListDataService {
         RenderOptions: [RenderListDataOptions.ListData],
         ExpandUserField: true
       };
+
+      // Paging: NextHref is a query string like "?Paged=TRUE&p_Title=...&p_ID=1602&PageFirstRow=31"
+      // PnPjs renderListDataAsStream accepts these as a Map<string, string> in the third argument
+      let queryMap: Map<string, string> | undefined;
       if (pagingToken) {
-        renderParams.Paging = pagingToken;
+        const qs = pagingToken.startsWith('?') ? pagingToken.substring(1) : pagingToken;
+        const map = new Map<string, string>();
+        const params = new URLSearchParams(qs);
+        params.forEach((value, key) => { map.set(key, value); });
+        queryMap = map;
       }
-      const response = await list.renderListDataAsStream(renderParams);
+
+      const response = await list.renderListDataAsStream(renderParams, undefined, queryMap);
 
       // Post-process rows to nest dot-notation lookup fields into proper objects
       const items = (response.Row || []).map((row: any) => ListDataService.nestLookupFields(row));

@@ -15,7 +15,10 @@ export interface IQueryParameter {
 /**
  * Authentication type for HTTP endpoints
  */
-export type HttpAuthType = 'aad' | 'anonymous' | 'apiKey' | 'bearer';
+export type HttpAuthType = 'aad' | 'anonymous' | 'apiKey' | 'bearer' | 'flow';
+
+/** Azure AD resource URI used to acquire tokens for Power Automate HTTP-triggered flows */
+const FLOW_RESOURCE_URI = 'https://service.flow.microsoft.com/';
 
 /**
  * HTTP endpoint configuration
@@ -197,6 +200,7 @@ export class HttpDataService {
     if (authType === 'aad' && !appId) {
       return { data: null, fromCache: false, error: new Error('AAD auth requires appId') };
     }
+    // 'flow' auth uses the well-known Flow resource URI — no appId needed
 
     const cacheKey = this.getCacheKey(config, context);
 
@@ -305,6 +309,9 @@ export class HttpDataService {
     if (authType === 'aad' && appId) {
       // Use AAD HTTP Client for Azure AD authenticated calls
       response = await this.fetchWithAadClient(appId, resolvedUrl, method, requestHeaders, resolvedBody);
+    } else if (authType === 'flow') {
+      // Use AAD HTTP Client against the Power Automate resource URI
+      response = await this.fetchWithAadClient(FLOW_RESOURCE_URI, resolvedUrl, method, requestHeaders, resolvedBody);
     } else {
       // Use standard HTTP Client for anonymous, apiKey, or bearer auth
       response = await this.fetchWithHttpClient(resolvedUrl, method, requestHeaders, resolvedBody);

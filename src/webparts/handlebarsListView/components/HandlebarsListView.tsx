@@ -4,7 +4,7 @@ import type { IHandlebarsListViewProps, IListDataSource, IHttpEndpointDataSource
 import Handlebars from "handlebars";
 
 import helpers from 'handlebars-helpers'
-import ReactHtmlParser from 'react-html-parser';
+//import ReactHtmlParser from 'react-html-parser';
 import { ListDataService, IListDataResult, HttpDataService, FormSubmitService, SocialDataService, ITokenContext } from '../services';
 import { scopeCssClasses } from './scopeCssClasses';
 
@@ -156,9 +156,11 @@ Handlebars.registerHelper('hbwp-checkbox', function(options: Handlebars.HelperOp
 Handlebars.registerHelper('hbwp-hidden', function(options: Handlebars.HelperOptions) {
   const name = options.hash['name'] || '';
   const value = options.hash['value'] || '';
+  const dataType = options.hash['type'] || '';
+  const typeAttr = dataType ? ` data-type="${dataType}"` : '';
   
   return new Handlebars.SafeString(
-    `<input type="hidden" name="${name}" value="${value}" />`
+    `<input type="hidden" name="${name}" value="${value}"${typeAttr} />`
   );
 });
 
@@ -268,6 +270,28 @@ Handlebars.registerHelper('starRating', function(rating: any) {
     (half ? '\u2BEA' : '') + '</span>' +
     '<span style="color:#d2d0ce;">' + '\u2606'.repeat(empty) + '</span>'
   );
+});
+
+// Custom helper: convert a value to an integer
+Handlebars.registerHelper('toInt', function(value: any) {
+  return parseInt(value, 10) || 0;
+});
+
+// Custom helper: modulo operation
+Handlebars.registerHelper('mod', function(a: any, b: any) {
+  return (parseInt(a, 10) || 0) % (parseInt(b, 10) || 1);
+});
+
+// Custom helper: shuffle an array (Fisher-Yates). Returns a new array.
+// Usage: {{#each (shuffle items.rows)}}...{{/each}}
+Handlebars.registerHelper('shuffle', function(arr: any) {
+  if (!Array.isArray(arr)) return arr;
+  const a = arr.slice(); // copy so we don't mutate the original
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+  }
+  return a;
 });
 
 /**
@@ -432,39 +456,109 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     
     if (!this.formSubmitService) {
       console.error('FormSubmitService not initialized');
-      this.dispatchFormResult(form, submitButton, originalButtonText, false, 'Form service not available');
+      this.showFormResult(form, submitButton, originalButtonText, false, 'Form service not available');
       return;
     }
     
     try {
       const result = await this.formSubmitService.submit(endpointKey, formData);
-      this.dispatchFormResult(form, submitButton, originalButtonText, result.success, result.error);
+      this.showFormResult(form, submitButton, originalButtonText, result.success, result.error, result.data);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.dispatchFormResult(form, submitButton, originalButtonText, false, errorMessage);
+      this.showFormResult(form, submitButton, originalButtonText, false, errorMessage);
     }
   }
   
   /**
-   * Dispatches the form result event back to the template
+   * Displays success/failure result inline in the form and re-enables the submit button.
    */
-  private dispatchFormResult(form: HTMLFormElement, submitButton: HTMLElement, originalButtonText: string, success: boolean, error?: string): void {
-    const resultEvent = new CustomEvent('hbwp-form-result', {
-      bubbles: true,
-      detail: { success, error, form, submitButton, originalButtonText }
-    });
-    form.dispatchEvent(resultEvent);
+  private showFormResult(
+    form: HTMLFormElement,
+    submitButton: HTMLElement | null,
+    originalButtonText: string,
+    success: boolean,
+    error?: string,
+    _data?: any
+  ): void {
+    // Re-enable submit button
+    if (submitButton) {
+      (submitButton as HTMLButtonElement).disabled = false;
+      submitButton.textContent = originalButtonText;
+    }
+
+    // Write message into the result container already rendered by {{#hbwp-form}}
+    const resultContainer = form.querySelector('[data-hbwp-result]') as HTMLElement | null;
+    if (resultContainer) {
+      if (success) {
+        resultContainer.innerHTML =
+          '<div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:4px;background:#dff6dd;color:#0e700e;font-size:14px;">' +
+          '<span style="font-size:16px;">&#10003;</span> Submitted successfully!' +
+          '</div>';
+        // Optionally reset form fields
+        if (form.dataset.hbwpReset !== 'false') {
+          // Reset native inputs
+          form.reset();
+          // Also reset Fluent UI web-component values that .reset() doesn't cover
+          form.querySelectorAll('fluent-text-field, fluent-text-area, fluent-select').forEach((el: any) => {
+            if (typeof el.value !== 'undefined') el.value = '';
+          });
+        }
+      } else {
+        resultContainer.innerHTML =
+          '<div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:4px;background:#fde7e9;color:#a80000;font-size:14px;">' +
+          '<span style="font-size:16px;">&#10007;</span> ' +
+          (error ? error.replace(/</g, '&lt;').replace(/>/g, '&gt;') : 'Submission failed') +
+          '</div>';
+      }
+      // Auto-clear the message after 8 seconds
+      setTimeout(() => { if (resultContainer) resultContainer.innerHTML = ''; }, 8000);
+    }
   }
 
   /**
-   * Handles social action events (like/unlike/rate) from the template
-   */
-  /**
-   * Delegated click handler for social actions (like/unlike, rate).
-   * Attached directly to the container — no injected <script> needed.
+   * Delegated click handler for template interactions:
+   * - Panel open/close: data-hbwp-panel-open="id" / data-hbwp-panel-close="id"
+   * - Social actions: data-hbwp-like, data-hbwp-rate
    */
   private handleContainerClick(e: Event): void {
     const target = e.target as HTMLElement;
+
+    // ── Panel open / close ──
+    // Uses data-hbwp-open attribute (not CSS class) to avoid scopeCssClasses renaming
+    // Works with both data-attribute toggle (div) and fluent-drawer (.show()/.hide())
+    const panelOpen = target.closest<HTMLElement>('[data-hbwp-panel-open]');
+    if (panelOpen) {
+      const panelId = panelOpen.getAttribute('data-hbwp-panel-open');
+      if (panelId) {
+        const panel = document.getElementById(panelId) as any;
+        if (panel) {
+          if (typeof panel.show === 'function') {
+            panel.show();
+          } else {
+            panel.setAttribute('data-hbwp-open', '');
+          }
+        }
+      }
+      return;
+    }
+
+    const panelClose = target.closest<HTMLElement>('[data-hbwp-panel-close]');
+    if (panelClose) {
+      const panelId = panelClose.getAttribute('data-hbwp-panel-close');
+      if (panelId) {
+        const panel = document.getElementById(panelId) as any;
+        if (panel) {
+          if (typeof panel.hide === 'function') {
+            panel.hide();
+          } else {
+            panel.removeAttribute('data-hbwp-open');
+          }
+        }
+      }
+      return;
+    }
+
+    // ── Social actions ──
     const likeBtn = target.closest<HTMLElement>('[data-hbwp-like]');
     const rateBtn = target.closest<HTMLElement>('[data-hbwp-rate]');
 
@@ -557,6 +651,23 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
         } else {
           formData[el.name] = el.value;
         }
+      }
+    }
+
+    // Coerce values based on data-type attributes
+    // Supports: data-type="number", data-type="boolean", data-type="string" (default)
+    // Works on <input>, <fluent-select>, <fluent-text-field>, and any named element
+    for (let i = 0; i < formElements.length; i++) {
+      const el = formElements[i] as HTMLElement & { name?: string };
+      if (!el.name || !(el.name in formData)) continue;
+      const dataType = el.getAttribute('data-type');
+      if (!dataType) continue;
+      const raw = formData[el.name];
+      if (dataType === 'number') {
+        const num = Number(raw);
+        formData[el.name] = isNaN(num) ? raw : num;
+      } else if (dataType === 'boolean') {
+        formData[el.name] = raw === 'true' || raw === '1' || raw === true;
       }
     }
 
@@ -902,7 +1013,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     const { html, visible } = this.state;
     return (
       <div ref={this.containerRef}>
-        {visible ? <div>{ReactHtmlParser(html)}</div> : null}
+        {visible ? <div dangerouslySetInnerHTML={{ __html: html }} /> : null}
       </div>
     );
   }

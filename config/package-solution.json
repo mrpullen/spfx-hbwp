@@ -20,8 +20,8 @@
         "scope": "User.Read"
       },
       {
-        "resource": "app_id",
-        "scope": "user_impersonation"
+        "resource": "Microsoft Flow Service",
+        "scope": "User"
       }
     ],
     "metadata": {

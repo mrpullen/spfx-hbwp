@@ -1,0 +1,88 @@
+{{!-- 
+  Flow Trigger Test Template
+  ==========================
+  Submits a form to an HTTP-triggered Power Automate flow.
+
+  Setup:
+  1. Add a data source (key: "users") pointing to your User table/list
+     - Must include Id and Title fields
+  2. Add a submit endpoint (key: "triggerFlow") with auth type "Power Automate Flow"
+     - Paste your flow's HTTP trigger URL
+
+  Sends JSON:
+    { "userId": <selected from dropdown>, "CurrentUserId": <logged-in user Id> }
+--}}
+
+<style>
+  .flow-test-{{wpId}} {
+    font-family: var(--body-font, 'Segoe UI', sans-serif);
+    max-width: 480px;
+    padding: 24px;
+  }
+
+  .flow-test-{{wpId}} h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #323130;
+    margin: 0 0 4px;
+  }
+
+  .flow-test-{{wpId}} .subtitle {
+    font-size: 13px;
+    color: #605e5c;
+    margin: 0 0 20px;
+  }
+
+  .flow-test-{{wpId}} .field-group {
+    margin-bottom: 16px;
+  }
+
+  .flow-test-{{wpId}} .field-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #323130;
+    margin-bottom: 6px;
+  }
+
+  .flow-test-{{wpId}} .current-user-info {
+    font-size: 13px;
+    color: #605e5c;
+    background: #f3f2f1;
+    padding: 8px 12px;
+    border-radius: 4px;
+  }
+</style>
+
+<div class="flow-test-{{wpId}}">
+  <h2>Trigger Flow</h2>
+  <p class="subtitle">Select a user and submit to trigger the Power Automate flow.</p>
+
+  {{#hbwp-form endpoint="triggerFlow"}}
+
+    {{!-- userId dropdown from users data source --}}
+    <div class="field-group">
+      <label class="field-label">Select User</label>
+      <fluent-select name="userId" required data-type="number" style="width: 100%;">
+        <fluent-option value="">-- Choose a user --</fluent-option>
+        {{#each users.rows}}
+          <fluent-option value="{{Id}}">{{Title}}</fluent-option>
+        {{/each}}
+      </fluent-select>
+    </div>
+
+    {{!-- CurrentUserId hidden field from logged-in user --}}
+    {{hbwp-hidden name="CurrentUserId" value=user.Id type="number"}}
+
+    {{!-- Show who is submitting --}}
+    <div class="field-group">
+      <span class="field-label">Submitting as</span>
+      <div class="current-user-info">
+        {{user.displayName}} (ID: {{user.Id}})
+      </div>
+    </div>
+
+    {{hbwp-submit label="Trigger Flow" appearance="accent"}}
+
+  {{/hbwp-form}}
+</div>

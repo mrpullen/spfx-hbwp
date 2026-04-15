@@ -386,6 +386,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
       // Validate based on auth type
       const isValid = key && url && (
         authType === 'aad' ? !!appId :
+        authType === 'flow' ? true :
         authType === 'apiKey' ? !!(apiKeyHeaderName && apiKeyValue) :
         authType === 'bearer' ? !!bearerToken :
         true // anonymous
@@ -561,7 +562,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
                   label: 'Select a list',
                   selectedList: this.properties.list,
                   webAbsoluteUrl: this.properties && this.properties.sites && this.properties.sites.length > 0 ? this.properties.sites[0].url : undefined,
-                  includeHidden: false,
+                  includeHidden: true,
                   orderBy: PropertyFieldListPickerOrderBy.Title,
                   disabled: !(this.properties && this.properties.sites && this.properties.sites.length > 0),
                   onPropertyChange: this.onPropertyPaneFieldChanged.bind(this),
@@ -842,7 +843,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
             label: 'Select List',
             selectedList: listId,
             webAbsoluteUrl: siteUrl,
-            includeHidden: false,
+            includeHidden: true,
             orderBy: PropertyFieldListPickerOrderBy.Title,
             disabled: !siteUrl,
             onPropertyChange: this.onPropertyPaneFieldChanged.bind(this),
@@ -936,6 +937,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
             label: 'Authentication Type',
             options: [
               { key: 'aad', text: 'Azure AD (AAD)' },
+              { key: 'flow', text: 'Power Automate Flow (HTTP trigger)' },
               { key: 'anonymous', text: 'Anonymous (No Auth)' },
               { key: 'apiKey', text: 'API Key (Header)' },
               { key: 'bearer', text: 'Bearer Token' }
@@ -948,6 +950,12 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
               label: 'Azure AD App ID (Client ID)',
               description: 'Required for AAD auth. Must be registered in package-solution.json',
               value: this.properties[`http${i}AppId`] || ''
+            })
+          ] : []),
+          // Flow-specific info
+          ...(authType === 'flow' ? [
+            PropertyPaneLabel(`http${i}FlowInfo`, {
+              text: 'Uses AAD auth against https://service.flow.microsoft.com/. Paste your flow\'s HTTP trigger URL below. The caller\'s identity is sent automatically — the flow runs as the current user, not "anyone".'
             })
           ] : []),
           // API Key-specific fields
@@ -1106,7 +1114,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
               label: 'Select List',
               selectedList: this.properties[`submit${i}SpList`],
               webAbsoluteUrl: siteUrl,
-              includeHidden: false,
+              includeHidden: true,
               orderBy: PropertyFieldListPickerOrderBy.Title,
               disabled: !siteUrl,
               onPropertyChange: this.onPropertyPaneFieldChanged.bind(this),
@@ -1128,6 +1136,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
               label: 'Authentication Type',
               options: [
                 { key: 'aad', text: 'Azure AD (AAD)' },
+                { key: 'flow', text: 'Power Automate Flow (HTTP trigger)' },
                 { key: 'anonymous', text: 'Anonymous (No Auth)' },
                 { key: 'apiKey', text: 'API Key (Header)' },
                 { key: 'bearer', text: 'Bearer Token' }
@@ -1139,6 +1148,11 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
                 label: 'Azure AD App ID',
                 description: 'App Registration client ID',
                 value: this.properties[`submit${i}HttpAppId`] || ''
+              })
+            ] : []),
+            ...(httpAuthType === 'flow' ? [
+              PropertyPaneLabel(`submit${i}FlowInfo`, {
+                text: 'Uses AAD auth against https://service.flow.microsoft.com/. Paste the HTTP trigger URL. The flow runs as the current user.'
               })
             ] : []),
             ...(httpAuthType === 'apiKey' ? [

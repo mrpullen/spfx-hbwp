@@ -275,7 +275,7 @@
 
     {{!-- ══════ My Actions (opens drawer) ══════ --}}
     <button class="metro-tile-{{wpId}}"
-            onclick="document.getElementById('actions-drawer-{{wpId}}').show()"
+            data-hbwp-panel-open="actions-drawer-{{wpId}}"
             type="button"
             title="My Actions">
       {{#if items.rows.length}}
@@ -297,7 +297,7 @@
   {{!-- ══════ My Actions Drawer ══════ --}}
   <fluent-drawer id="actions-drawer-{{wpId}}" position="end" modal-type="modal" hidden>
     <div slot="title">My Actions</div>
-    <fluent-button slot="title-action" appearance="subtle" onclick="this.closest('fluent-drawer').hide()" title="Close">
+    <fluent-button slot="title-action" appearance="subtle" data-hbwp-panel-close="actions-drawer-{{wpId}}" title="Close">
       ✕
     </fluent-button>
     <div style="padding: 20px;">
@@ -323,7 +323,7 @@
         </div>
       {{/if}}
     </div>
-    <fluent-button slot="action" appearance="outline" onclick="this.closest('fluent-drawer').hide()">
+    <fluent-button slot="action" appearance="outline" data-hbwp-panel-close="actions-drawer-{{wpId}}">
       Close
     </fluent-button>
   </fluent-drawer>

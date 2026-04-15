@@ -10,9 +10,9 @@ A powerful, flexible SharePoint Framework (SPFx) web part that renders SharePoin
 - 📋 **Multiple Data Sources** - Connect to SharePoint lists and HTTP endpoints
 - 🎨 **Handlebars Templates** - Full templating with 180+ helpers from handlebars-helpers
 - 🌐 **Fluent UI Web Components** - Modern, accessible UI components
-- 🔐 **Multi-Auth Support** - AAD, API Key, Bearer Token, or Anonymous for HTTP endpoints
-- 💾 **Per-Source Caching** - Individual cache timeouts stored in localStorage
-- 📝 **Form Submission** - Submit data back to SharePoint lists or HTTP endpoints
+- 🔐 **Multi-Auth Support** - AAD, API Key, Bearer Token, Anonymous, or Power Automate Flow for HTTP endpoints
+- 💾 **Per-Source Caching** - Individual cache timeouts stored in localStorage (auto-bypassed for paged requests)
+- 📝 **Form Submission** - Submit data to SharePoint lists, HTTP endpoints, or Power Automate HTTP-triggered flows
 - 👤 **User Context** - Access current user profile in templates
 - 🔄 **Token Replacement** - Use `{{user.email}}`, `{{page.Id}}`, `{{query.param}}` in CAML filters, URLs, and templates
 - ❤️ **Social Integration** - Interactive like/unlike toggle with optimistic UI (`{{likeButton}}` helper)
@@ -20,6 +20,11 @@ A powerful, flexible SharePoint Framework (SPFx) web part that renders SharePoin
 - 🎨 **Auto CSS Scoping** - CSS classes in `<style>` blocks are automatically scoped per web part instance
 - 🔍 **Dynamic CAML Filters** - Filter list data using `{{page.Id}}`, `{{user.department}}`, `{{query.category}}` tokens
 - 📄 **External Templates** - Load `.hbs` template files from SharePoint document libraries
+- 📑 **Server-Side Paging** - Prev/next navigation via `renderListDataAsStream` with `{{hbwp-paging}}` helper
+- 🎯 **CSP-Compliant Interactions** - Delegated event handlers via `data-hbwp-*` attributes (no inline JS)
+- 🔀 **Data Manipulation** - `shuffle`, `filter`, `toInt`, `mod` helpers for in-template data processing
+- 🏗️ **Panel / Drawer Support** - Slide-in panels via `data-hbwp-panel-open` / `data-hbwp-panel-close` attributes
+- 🔧 **Tenant-Specific Permissions** - Gitignored `webApiPermissions-config.json` merged at build time
 
 ---
 
@@ -29,7 +34,7 @@ Planned features and enhancements — see [docs/backlog.md](docs/backlog.md) for
 
 | Feature | Complexity | Description |
 |---|---|---|
-| [Paging Control](docs/backlog.md#paging-control) | Medium | Prev/next navigation using `renderListDataAsStream` paging tokens |
+| [Paging Control](docs/backlog.md#paging-control) | ~~Medium~~ | ✅ Prev/next navigation using `renderListDataAsStream` paging tokens |
 | [Template Lookup Helpers](docs/backlog.md#template-lookup-helpers-client-side-joins) | Low | `findItem` / `findItems` for cross-list client-side joins |
 | [Query Parameter Tokens](docs/backlog.md#query-parameter-token-support) | ~~Low~~ | ✅ `{{query.paramName}}` in CAML filters and templates |
 | [Web Part Connections](docs/backlog.md#web-part-connections-dynamic-data) | High | SPFx Dynamic Data for cross-web-part filtering |
@@ -114,7 +119,7 @@ Each data source has:
 |-------|-------------|
 | Key | Template reference (e.g., `{{api.items}}`) |
 | URL | Endpoint URL with token support |
-| Auth Type | `aad`, `anonymous`, `apiKey`, `bearer` |
+| Auth Type | `aad`, `anonymous`, `apiKey`, `bearer`, `flow` |
 | App ID | Azure AD app registration (for AAD auth) |
 | API Key Header/Value | Custom header authentication |
 | Cache Timeout | Per-endpoint caching |
@@ -170,6 +175,8 @@ Templates receive this data structure:
 
 ### Custom Helpers
 
+See [docs/helpers.md](docs/helpers.md) for a complete reference of all custom Handlebars helpers with usage examples.
+
 | Helper | Description | Example |
 |--------|-------------|---------|
 | `filter` | Filter array by property (handles SP lookups) | `{{#each (filter items "Status" "Active")}}` |
@@ -177,6 +184,12 @@ Templates receive this data structure:
 | `substring` | Get substring | `{{substring name 0 1}}` → First letter |
 | `concat` | Concatenate strings | `{{concat "ID-" item.Id}}` → `ID-123` |
 | `json` | Output data as formatted JSON (for debugging) | `{{json items}}` → pretty-printed JSON |
+| `starRating` | Render ★★★★☆ star display | `{{starRating 4}}` → 4 filled + 1 empty |
+| `likeButton` | Like/unlike toggle with count | `{{likeButton ID LikesCount LikedBy ../user.id}}` |
+| `toInt` | Parse value to integer | `{{toInt "42"}}` → `42` |
+| `mod` | Modulo operation | `{{mod 7 3}}` → `1` |
+| `shuffle` | Randomize array order (Fisher-Yates) | `{{#each (shuffle items.rows)}}` |
+| `hbwp-paging` | Prev/next page navigation | `{{hbwp-paging items.paging label="people"}}` |
 
 ### Form Helpers
 
@@ -440,14 +453,26 @@ POSTs JSON to the configured endpoint with authentication.
 
 ### Handle Response in Template
 
-```javascript
-document.addEventListener('hbwp-form-result', function(e) {
-  if (e.detail.success) {
-    alert('Saved successfully!');
-  } else {
-    alert('Error: ' + e.detail.error);
-  }
-});
+Form results are displayed inline within the form's `[data-hbwp-result]` div automatically. Success shows a green message, failure shows red. Messages auto-clear after 8 seconds and the submit button is re-enabled.
+
+### Power Automate Flow Submission
+
+To submit form data to a Power Automate HTTP-triggered flow:
+
+1. Set the submit endpoint **Auth Type** to **Power Automate Flow (HTTP trigger)**
+2. Set the **URL** to your flow's HTTP trigger URL
+3. Form data is POSTed as JSON with AAD authentication against `https://service.flow.microsoft.com/`
+
+Requires the `Microsoft Flow Service / User` permission in `package-solution.json`.
+
+### Typed Form Data
+
+Add `data-type` attributes to form elements for automatic type coercion:
+
+```html
+<input name="count" data-type="number" value="5" />       <!-- → 5 (number) -->
+<input name="active" data-type="boolean" value="true" />   <!-- → true (boolean) -->
+{{hbwp-hidden name="UserId" value=user.id type="number"}}  <!-- → number -->
 ```
 
 ---
@@ -478,6 +503,44 @@ For HTTP endpoints using AAD authentication, add to `config/package-solution.jso
 }
 ```
 
+### Tenant-Specific Permissions (Build-Time Merge)
+
+To keep sensitive or tenant-specific API permission names out of the public repo:
+
+1. Create `config/webApiPermissions-config.json` (gitignored):
+
+```json
+{
+  "webApiPermissionRequests": [
+    {
+      "resource": "My Internal Service",
+      "scope": "user_impersonation"
+    }
+  ]
+}
+```
+
+2. At build time, the gulp `merge-api-permissions` subtask merges entries from this file into `package-solution.json`, deduplicating by `resource + scope`. After the build completes, the original `package-solution.json` is automatically restored.
+
+---
+
+## Interaction Model (CSP-Compliant)
+
+SharePoint Online's Content Security Policy blocks inline `onclick` handlers. All interactions use delegated `data-hbwp-*` attributes instead:
+
+| Attribute | Purpose | Example |
+|-----------|---------|---------|
+| `data-hbwp-panel-open="panelId"` | Open a panel/drawer by element ID | `<button data-hbwp-panel-open="my-panel">Open</button>` |
+| `data-hbwp-panel-close="panelId"` | Close a panel/drawer | `<button data-hbwp-panel-close="my-panel">Close</button>` |
+| `data-hbwp-page="next"` | Navigate to next page | Rendered by `{{hbwp-paging}}` helper |
+| `data-hbwp-page="prev"` | Navigate to previous page | Rendered by `{{hbwp-paging}}` helper |
+| `data-hbwp-like="itemId"` | Toggle like on an item | Rendered by `{{likeButton}}` helper |
+| `data-hbwp-rate="itemId"` | Submit a star rating | `<span data-hbwp-rate="42" data-hbwp-rate-value="4">` |
+| `data-hbwp-submit="endpointKey"` | Form submission target | Rendered by `{{#hbwp-form}}` helper |
+| `data-hbwp-open` | Panel open state (set/removed by JS) | CSS: `.panel[data-hbwp-open] { ... }` |
+
+Panels use `data-hbwp-open` attribute (not CSS classes) for state to avoid interference from the auto CSS scoping system.
+
 ---
 
 ## Template Builder Tool
@@ -497,6 +560,7 @@ For rapid template development, see the companion project:
 | 1.1.0 | Feb 2025 | Multiple data sources, HTTP endpoints |
 | 1.2.0 | Feb 2025 | Form submission, multi-auth, survey template |
 | 1.3.0 | Apr 2026 | PageDataService (`{{page.*}}` tokens), CAML filter support with token resolution, `json` Handlebars helper, debug template |
+| 1.4.0 | Apr 2026 | Power Automate flow auth, server-side paging, CSP-compliant panel/drawer interactions, persona card template, metro-links template, typed form data (`data-type`), inline form result display, `starRating`/`toInt`/`mod`/`shuffle`/`hbwp-paging` helpers, cache bypass for paged requests, build-time API permissions merge |
 
 ---
 
