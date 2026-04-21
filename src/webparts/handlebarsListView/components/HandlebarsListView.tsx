@@ -842,10 +842,16 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
    * Loads all data including primary list, additional data sources, HTTP endpoints, and user profile
    */
   private async getAllData(): Promise<ITemplateData> {
+    // Parse URL query string parameters for use in CAML filters and templates
+    const query: Record<string, string> = {};
+    const params = new URLSearchParams(window.location.search);
+    params.forEach((value, key) => { query[key] = value; });
+
     // Build token context from user and page data (available before list fetches)
     const filterTokenContext: ITokenContext = {
       user: this.props.userProfile || {},
-      page: this.props.pageData || {}
+      page: this.props.pageData || {},
+      query
     };
 
     // Get primary list data (with resolved CAML filter)
@@ -871,6 +877,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       items: primaryEnvelope.rows,
       user: this.props.userProfile || {},
       page: this.props.pageData || {},
+      query,
       ...dsRows
     };
 
@@ -883,6 +890,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       items: primaryEnvelope,
       user: ListDataService.normalizeData(this.props.userProfile || {}),
       page: ListDataService.normalizeData(this.props.pageData || {}),
+      query,
       // Include instanceId for unique DOM element IDs when multiple web parts are on a page
       wpId: this.props.instanceId,
       instanceId: this.props.instanceId,
