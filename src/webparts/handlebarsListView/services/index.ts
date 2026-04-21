@@ -5,3 +5,4 @@ export * from './ListDataService';
 export * from './HttpDataService';
 export * from './FormSubmitService';
 export * from './SocialDataService';
+export * from './ModernPageSocialService';
