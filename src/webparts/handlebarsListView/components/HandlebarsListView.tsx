@@ -166,9 +166,21 @@ Handlebars.registerHelper('hbwp-hidden', function(options: Handlebars.HelperOpti
 const HEART_FILL_SVG = '<svg data-hbwp-heart-svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M7.99 3.31C6.57 1.07 2.54.73 1.09 3.52c-1.37 2.64.46 5.47 3.93 8.27.96.78 1.95 1.46 2.98 2.21 1.02-.75 2.01-1.43 2.97-2.2 3.47-2.8 5.3-5.64 3.93-8.28C13.45.73 9.42 1.07 7.99 3.31z"/></svg>';
 const HEART_OUTLINE_SVG = '<svg data-hbwp-heart-svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M7.99 3.31C6.57 1.07 2.54.73 1.09 3.52c-1.37 2.64.46 5.47 3.93 8.27.96.78 1.95 1.46 2.98 2.21 1.02-.75 2.01-1.43 2.97-2.2 3.47-2.8 5.3-5.64 3.93-8.28C13.45.73 9.42 1.07 7.99 3.31z" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>';
 
-// Custom helper: render a self-contained like/unlike toggle button matching OOTB SharePoint heart.
+// SVG path constants for thumbs-up icons (Fluent UI ThumbLikeFilled / ThumbLike)
+const THUMBSUP_FILL_SVG = '<svg data-hbwp-heart-svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor"><path d="M10.46 2.17a1.75 1.75 0 0 1 1.7 1.34l.47 1.89c.2.77.63 1.47 1.23 2.01l.55.5H15c1.1 0 2 .9 2 2v5.5a2.5 2.5 0 0 1-2.5 2.5H7.37a2.5 2.5 0 0 1-2.4-1.8l-1.2-4.16A2.5 2.5 0 0 1 6.18 7.9h1.3l.37-2.21A2.75 2.75 0 0 1 10.46 2.17zM3 9a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1 1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z"/></svg>';
+const THUMBSUP_OUTLINE_SVG = '<svg data-hbwp-heart-svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor"><path d="M10.46 2.17a1.75 1.75 0 0 1 1.7 1.34l.47 1.89c.2.77.63 1.47 1.23 2.01l.55.5H15c1.1 0 2 .9 2 2v5.5a2.5 2.5 0 0 1-2.5 2.5H7.37a2.5 2.5 0 0 1-2.4-1.8l-1.2-4.16A2.5 2.5 0 0 1 6.18 7.9h1.3l.37-2.21A2.75 2.75 0 0 1 10.46 2.17zM3 9a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1 1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1"/></svg>';
+
+// Icon lookup map for like buttons
+const LIKE_ICONS: Record<string, { fill: string; outline: string }> = {
+  heart: { fill: HEART_FILL_SVG, outline: HEART_OUTLINE_SVG },
+  thumbsup: { fill: THUMBSUP_FILL_SVG, outline: THUMBSUP_OUTLINE_SVG }
+};
+
+// Custom helper: render a self-contained like/unlike toggle button matching OOTB SharePoint.
 // Usage: {{likeButton ID LikesCount LikedBy ../user.id}}
 // With color override: {{likeButton ID LikesCount LikedBy ../user.id color="#e3008c"}}
+// With thumbs-up icon: {{likeButton ID LikesCount LikedBy ../user.id icon="thumbsup"}}
+// Supported icons: "heart" (default), "thumbsup"
 Handlebars.registerHelper('likeButton', function(this: any, itemId: any, likesCount: any, likedByArray: any, userId: any, options: any) {
   const count = parseInt(likesCount, 10) || 0;
   let liked = false;
@@ -178,22 +190,26 @@ Handlebars.registerHelper('likeButton', function(this: any, itemId: any, likesCo
       return String(propValue) === String(userId);
     });
   }
-  const activeColor = (options && options.hash && options.hash.color) || 'var(--ms-palette-neutralPrimary, #323130)';
+  const hash = options && options.hash ? options.hash : {};
+  const iconType: string = (hash.icon || 'heart').toLowerCase();
+  const icons = LIKE_ICONS[iconType] || LIKE_ICONS.heart;
+  const activeColor = hash.color || 'var(--ms-palette-neutralPrimary, #323130)';
   const inactiveColor = 'var(--ms-semanticColors-infoIcon, #605e5c)';
-  const heartSvg = liked ? HEART_FILL_SVG : HEART_OUTLINE_SVG;
-  const heartColor = liked ? activeColor : inactiveColor;
+  const iconSvg = liked ? icons.fill : icons.outline;
+  const iconColor = liked ? activeColor : inactiveColor;
   const title = liked
     ? 'You have liked this item, click to unlike it'
     : 'Click to like this item';
   const label = count === 1 ? 'Like' : 'Likes';
   const escapedId = Handlebars.Utils.escapeExpression(String(itemId));
   const escapedActiveColor = Handlebars.Utils.escapeExpression(activeColor);
+  const escapedIconType = Handlebars.Utils.escapeExpression(iconType);
   return new Handlebars.SafeString(
-    `<div data-hbwp-like="${escapedId}" data-hbwp-liked="${liked}" data-hbwp-active-color="${escapedActiveColor}" ` +
+    `<div data-hbwp-like="${escapedId}" data-hbwp-liked="${liked}" data-hbwp-active-color="${escapedActiveColor}" data-hbwp-icon="${escapedIconType}" ` +
     `tabindex="0" role="button" title="${title}" ` +
     `style="align-items:center;background:none;border-radius:2px;border:none;cursor:pointer;display:inline-flex;height:fit-content;min-height:28px;width:fit-content;padding:0;font-family:inherit">` +
-    `<div data-hbwp-heart style="align-items:center;background-color:transparent;color:${heartColor};display:flex;font-size:16px;height:28px;justify-content:center;width:28px;position:relative">` +
-    heartSvg +
+    `<div data-hbwp-heart style="align-items:center;background-color:transparent;color:${iconColor};display:flex;font-size:16px;height:28px;justify-content:center;width:28px;position:relative">` +
+    iconSvg +
     `</div>` +
     `<div data-hbwp-count style="font-size:12px;color:var(--ms-palette-neutralPrimary,#323130);white-space:nowrap">${count} ${label}</div>` +
     `</div>`
@@ -204,6 +220,8 @@ Handlebars.registerHelper('likeButton', function(this: any, itemId: any, likesCo
 // Use this when rendering items from a Site Pages library so likes sync with the native page UI.
 // Usage: {{likePageButton ID LikesCount LikedBy ../user.id}}
 // With color override: {{likePageButton ID LikesCount LikedBy ../user.id color="#e3008c"}}
+// With thumbs-up icon: {{likePageButton ID LikesCount LikedBy ../user.id icon="thumbsup"}}
+// Supported icons: "heart" (default), "thumbsup"
 Handlebars.registerHelper('likePageButton', function(this: any, itemId: any, likesCount: any, likedByArray: any, userId: any, options: any) {
   const count = parseInt(likesCount, 10) || 0;
   let liked = false;
@@ -213,22 +231,26 @@ Handlebars.registerHelper('likePageButton', function(this: any, itemId: any, lik
       return String(propValue) === String(userId);
     });
   }
-  const activeColor = (options && options.hash && options.hash.color) || 'var(--ms-palette-neutralPrimary, #323130)';
+  const hash = options && options.hash ? options.hash : {};
+  const iconType: string = (hash.icon || 'heart').toLowerCase();
+  const icons = LIKE_ICONS[iconType] || LIKE_ICONS.heart;
+  const activeColor = hash.color || 'var(--ms-palette-neutralPrimary, #323130)';
   const inactiveColor = 'var(--ms-semanticColors-infoIcon, #605e5c)';
-  const heartSvg = liked ? HEART_FILL_SVG : HEART_OUTLINE_SVG;
-  const heartColor = liked ? activeColor : inactiveColor;
+  const iconSvg = liked ? icons.fill : icons.outline;
+  const iconColor = liked ? activeColor : inactiveColor;
   const title = liked
     ? 'You have liked this page, click to unlike it'
     : 'Click to like this page';
   const label = count === 1 ? 'Like' : 'Likes';
   const escapedId = Handlebars.Utils.escapeExpression(String(itemId));
   const escapedActiveColor = Handlebars.Utils.escapeExpression(activeColor);
+  const escapedIconType = Handlebars.Utils.escapeExpression(iconType);
   return new Handlebars.SafeString(
-    `<div data-hbwp-page-like="${escapedId}" data-hbwp-liked="${liked}" data-hbwp-active-color="${escapedActiveColor}" ` +
+    `<div data-hbwp-page-like="${escapedId}" data-hbwp-liked="${liked}" data-hbwp-active-color="${escapedActiveColor}" data-hbwp-icon="${escapedIconType}" ` +
     `tabindex="0" role="button" title="${title}" ` +
     `style="align-items:center;background:none;border-radius:2px;border:none;cursor:pointer;display:inline-flex;height:fit-content;min-height:28px;width:fit-content;padding:0;font-family:inherit">` +
-    `<div data-hbwp-heart style="align-items:center;background-color:transparent;color:${heartColor};display:flex;font-size:16px;height:28px;justify-content:center;width:28px;position:relative">` +
-    heartSvg +
+    `<div data-hbwp-heart style="align-items:center;background-color:transparent;color:${iconColor};display:flex;font-size:16px;height:28px;justify-content:center;width:28px;position:relative">` +
+    iconSvg +
     `</div>` +
     `<div data-hbwp-count style="font-size:12px;color:var(--ms-palette-neutralPrimary,#323130);white-space:nowrap">${count} ${label}</div>` +
     `</div>`
@@ -514,17 +536,18 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       const pageItemId = pageLikeBtn.getAttribute('data-hbwp-page-like');
       const liked = pageLikeBtn.getAttribute('data-hbwp-liked') === 'true';
 
-      // Optimistic UI — same heart toggle as regular likes
+      // Optimistic UI — swap icon and toggle colors
       const heartWrap = pageLikeBtn.querySelector('[data-hbwp-heart]') as HTMLElement;
       const countEl = pageLikeBtn.querySelector('[data-hbwp-count]');
       const activeColor = pageLikeBtn.getAttribute('data-hbwp-active-color') || 'var(--ms-palette-neutralPrimary, #323130)';
       const inactiveColor = 'var(--ms-semanticColors-infoIcon, #605e5c)';
+      const pageLikeIcons = LIKE_ICONS[pageLikeBtn.getAttribute('data-hbwp-icon') || 'heart'] || LIKE_ICONS.heart;
       if (heartWrap) {
         if (liked) {
-          heartWrap.innerHTML = HEART_OUTLINE_SVG;
+          heartWrap.innerHTML = pageLikeIcons.outline;
           heartWrap.style.color = inactiveColor;
         } else {
-          heartWrap.innerHTML = HEART_FILL_SVG;
+          heartWrap.innerHTML = pageLikeIcons.fill;
           heartWrap.style.color = activeColor;
         }
       }
@@ -547,17 +570,18 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       const itemId = likeBtn.getAttribute('data-hbwp-like');
       const liked = likeBtn.getAttribute('data-hbwp-liked') === 'true';
 
-      // Optimistic UI — swap SVG heart and toggle colors to match OOTB SharePoint
+      // Optimistic UI — swap icon and toggle colors to match OOTB SharePoint
       const heartWrap = likeBtn.querySelector('[data-hbwp-heart]') as HTMLElement;
       const countEl = likeBtn.querySelector('[data-hbwp-count]');
       const activeColor = likeBtn.getAttribute('data-hbwp-active-color') || 'var(--ms-palette-neutralPrimary, #323130)';
       const inactiveColor = 'var(--ms-semanticColors-infoIcon, #605e5c)';
+      const likeIcons = LIKE_ICONS[likeBtn.getAttribute('data-hbwp-icon') || 'heart'] || LIKE_ICONS.heart;
       if (heartWrap) {
         if (liked) {
-          heartWrap.innerHTML = HEART_OUTLINE_SVG;
+          heartWrap.innerHTML = likeIcons.outline;
           heartWrap.style.color = inactiveColor;
         } else {
-          heartWrap.innerHTML = HEART_FILL_SVG;
+          heartWrap.innerHTML = likeIcons.fill;
           heartWrap.style.color = activeColor;
         }
       }
