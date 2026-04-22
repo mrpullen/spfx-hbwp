@@ -7,8 +7,8 @@ import "@pnp/sp/items";
 import { AadHttpClient, AadHttpClientFactory, HttpClient, HttpClientResponse, IHttpClientOptions } from '@microsoft/sp-http';
 import { ISubmitEndpoint } from '../components/IHandlebarsListViewProps';
 
-/** Azure AD resource URI used to acquire tokens for Power Automate HTTP-triggered flows */
-const FLOW_RESOURCE_URI = 'https://service.flow.microsoft.com/';
+/** Default Azure AD resource URI used to acquire tokens for Power Automate HTTP-triggered flows */
+const DEFAULT_FLOW_RESOURCE_URI = 'https://service.flow.microsoft.com/';
 
 /**
  * Result of a form submission
@@ -45,15 +45,18 @@ export class FormSubmitService {
   private httpClient: HttpClient;
   private submitEndpoints: Map<string, ISubmitEndpoint> = new Map();
   private aadClientCache: Map<string, AadHttpClient> = new Map();
+  private flowResourceUri: string;
 
   constructor(
     sp: SPFI,
     aadHttpClientFactory: AadHttpClientFactory,
-    httpClient: HttpClient
+    httpClient: HttpClient,
+    flowResourceUri?: string
   ) {
     this.sp = sp;
     this.aadHttpClientFactory = aadHttpClientFactory;
     this.httpClient = httpClient;
+    this.flowResourceUri = flowResourceUri || DEFAULT_FLOW_RESOURCE_URI;
   }
 
   /**
@@ -173,7 +176,7 @@ export class FormSubmitService {
       });
     } else if (authType === 'flow') {
       // Use AAD HTTP Client against the Power Automate resource URI
-      const client = await this.getAadClient(FLOW_RESOURCE_URI);
+      const client = await this.getAadClient(this.flowResourceUri);
       response = await client.fetch(url, AadHttpClient.configurations.v1, {
         method,
         headers,

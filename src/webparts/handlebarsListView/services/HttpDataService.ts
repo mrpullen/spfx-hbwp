@@ -17,8 +17,8 @@ export interface IQueryParameter {
  */
 export type HttpAuthType = 'aad' | 'anonymous' | 'apiKey' | 'bearer' | 'flow';
 
-/** Azure AD resource URI used to acquire tokens for Power Automate HTTP-triggered flows */
-const FLOW_RESOURCE_URI = 'https://service.flow.microsoft.com/';
+/** Default Azure AD resource URI used to acquire tokens for Power Automate HTTP-triggered flows */
+const DEFAULT_FLOW_RESOURCE_URI = 'https://service.flow.microsoft.com/';
 
 /**
  * HTTP endpoint configuration
@@ -86,6 +86,7 @@ export class HttpDataService {
   private cacheEnabled: boolean;
   private cacheTimeoutMinutes: number;
   private aadClientCache: Map<string, AadHttpClient> = new Map();
+  private flowResourceUri: string;
 
   constructor(
     aadHttpClientFactory: AadHttpClientFactory,
@@ -94,12 +95,14 @@ export class HttpDataService {
       enabled?: boolean;
       timeoutMinutes?: number;
       cacheServiceConfig?: Partial<ICacheConfig>;
-    }
+    },
+    flowResourceUri?: string
   ) {
     this.aadHttpClientFactory = aadHttpClientFactory;
     this.httpClient = httpClient;
     this.cacheEnabled = cacheConfig?.enabled ?? true;
     this.cacheTimeoutMinutes = cacheConfig?.timeoutMinutes ?? 15;
+    this.flowResourceUri = flowResourceUri || DEFAULT_FLOW_RESOURCE_URI;
     
     // Initialize cache service with shared prefix
     this.cacheService = new CacheService({
@@ -311,7 +314,7 @@ export class HttpDataService {
       response = await this.fetchWithAadClient(appId, resolvedUrl, method, requestHeaders, resolvedBody);
     } else if (authType === 'flow') {
       // Use AAD HTTP Client against the Power Automate resource URI
-      response = await this.fetchWithAadClient(FLOW_RESOURCE_URI, resolvedUrl, method, requestHeaders, resolvedBody);
+      response = await this.fetchWithAadClient(this.flowResourceUri, resolvedUrl, method, requestHeaders, resolvedBody);
     } else {
       // Use standard HTTP Client for anonymous, apiKey, or bearer auth
       response = await this.fetchWithHttpClient(resolvedUrl, method, requestHeaders, resolvedBody);

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import * as React from 'react';
 import type { IHandlebarsListViewProps, IListDataSource, IHttpEndpointDataSource } from './IHandlebarsListViewProps';
+import { FLOW_RESOURCE_URIS } from './IHandlebarsListViewProps';
 import Handlebars from "handlebars";
 
 import helpers from 'handlebars-helpers'
@@ -388,6 +389,9 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       });
     }
     
+    // Resolve flow resource URI based on cloud environment
+    const flowResourceUri = FLOW_RESOURCE_URIS[props.cloudEnvironment || 'commercial'];
+    
     // Initialize HTTP data service if both clients are available
     if (props.aadHttpClientFactory && props.httpClient) {
       this.httpDataService = new HttpDataService(
@@ -396,7 +400,8 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
         {
           enabled: props.cacheOptions?.enabled ?? true,
           timeoutMinutes: props.cacheOptions?.timeoutMinutes ?? 15
-        }
+        },
+        flowResourceUri
       );
     }
     
@@ -405,7 +410,8 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       this.formSubmitService = new FormSubmitService(
         props.sp,
         props.aadHttpClientFactory,
-        props.httpClient
+        props.httpClient,
+        flowResourceUri
       );
       // Register submit endpoints if provided
       if (props.submitEndpoints) {
@@ -436,7 +442,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     if (this.containerRef.current) {
       this.containerRef.current.addEventListener('click', this.handleContainerClick);
       this.containerRef.current.addEventListener('submit', this.handleContainerSubmit);
-      this.containerRef.current.addEventListener('hbwp-form-submit', this.handleFormSubmit as EventListener);
+      this.containerRef.current.addEventListener('hbwp-form-submit', this.handleFormSubmit as unknown as EventListener);
     }
   }
   
@@ -444,7 +450,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     if (this.containerRef.current) {
       this.containerRef.current.removeEventListener('click', this.handleContainerClick);
       this.containerRef.current.removeEventListener('submit', this.handleContainerSubmit);
-      this.containerRef.current.removeEventListener('hbwp-form-submit', this.handleFormSubmit as EventListener);
+      this.containerRef.current.removeEventListener('hbwp-form-submit', this.handleFormSubmit as unknown as EventListener);
     }
   }
 
@@ -775,6 +781,33 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     if (this.formSubmitService && this.props.submitEndpoints) {
       if (JSON.stringify(prevProps.submitEndpoints) !== JSON.stringify(this.props.submitEndpoints)) {
         this.formSubmitService.registerEndpoints(this.props.submitEndpoints);
+      }
+    }
+    
+    // Reinitialize services if cloud environment changed (flow resource URI changes)
+    if (prevProps.cloudEnvironment !== this.props.cloudEnvironment) {
+      const flowResourceUri = FLOW_RESOURCE_URIS[this.props.cloudEnvironment || 'commercial'];
+      if (this.props.aadHttpClientFactory && this.props.httpClient) {
+        this.httpDataService = new HttpDataService(
+          this.props.aadHttpClientFactory,
+          this.props.httpClient,
+          {
+            enabled: this.props.cacheOptions?.enabled ?? true,
+            timeoutMinutes: this.props.cacheOptions?.timeoutMinutes ?? 15
+          },
+          flowResourceUri
+        );
+      }
+      if (this.props.sp && this.props.aadHttpClientFactory && this.props.httpClient) {
+        this.formSubmitService = new FormSubmitService(
+          this.props.sp,
+          this.props.aadHttpClientFactory,
+          this.props.httpClient,
+          flowResourceUri
+        );
+        if (this.props.submitEndpoints) {
+          this.formSubmitService.registerEndpoints(this.props.submitEndpoints);
+        }
       }
     }
     

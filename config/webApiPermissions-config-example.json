@@ -1,0 +1,16 @@
+{
+  "webApiPermissionRequests": [
+     {
+        "resource": "Microsoft Flow Service",
+        "scope": "User"
+      },
+      {
+        "resource": "Microsoft Flow Service GCC",
+        "scope": "User"
+      },
+      {
+        "resource": "Microsoft Flow Service GCC High",
+        "scope": "User"
+      }
+  ]
+}

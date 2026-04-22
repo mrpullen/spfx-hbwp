@@ -18,7 +18,7 @@ import { BaseClientSideWebPart } from '@microsoft/sp-webpart-base';
 
 import * as strings from 'HandlebarsListViewWebPartStrings';
 import HandlebarsListView from './components/HandlebarsListView';
-import { IListDataSource, IHttpEndpointDataSource, IQueryParameter, ISubmitEndpoint, HttpAuthType, SubmitEndpointType } from './components/IHandlebarsListViewProps';
+import { IListDataSource, IHttpEndpointDataSource, IQueryParameter, ISubmitEndpoint, HttpAuthType, SubmitEndpointType, CloudEnvironment, FLOW_RESOURCE_URIS } from './components/IHandlebarsListViewProps';
 import { PropertyFieldSitePicker, PropertyFieldListPicker, PropertyFieldListPickerOrderBy, IPropertyFieldSite } from '@pnp/spfx-property-controls';
 import { PropertyFieldViewPicker, PropertyFieldViewPickerOrderBy } from '@pnp/spfx-property-controls/lib/PropertyFieldViewPicker';
 
@@ -62,6 +62,8 @@ export interface IHandlebarsListViewWebPartProps {
   cacheTimeoutMinutes: number;
   /** Number of HTTP endpoints */
   httpEndpointCount: number;
+  /** Cloud environment for Power Automate Flow endpoints */
+  cloudEnvironment: CloudEnvironment;
   // Dynamic properties for data sources and HTTP endpoints will be added at runtime
   [key: string]: any;
 }
@@ -475,6 +477,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
         dataSources: dataSources,
         httpEndpoints: httpEndpoints,
         submitEndpoints: submitEndpoints,
+        cloudEnvironment: this.properties.cloudEnvironment || 'commercial',
         template: effectiveTemplate,
         cacheOptions: {
           enabled: this.properties.enableCache ?? true,
@@ -710,6 +713,23 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
                 }),
                 PropertyPaneLabel('cacheInfo', {
                   text: 'User profile is cached for 24 hours. List data uses the timeout above.'
+                })
+              ]
+            },
+            {
+              groupName: 'Cloud Environment',
+              groupFields: [
+                PropertyPaneDropdown('cloudEnvironment', {
+                  label: 'Cloud Environment',
+                  options: [
+                    { key: 'commercial', text: 'Commercial (Public)' },
+                    { key: 'gcc', text: 'GCC (Government Community Cloud)' },
+                    { key: 'gcchigh', text: 'GCC High' }
+                  ],
+                  selectedKey: this.properties.cloudEnvironment || 'commercial'
+                }),
+                PropertyPaneLabel('cloudEnvironmentInfo', {
+                  text: 'Affects Power Automate Flow (HTTP trigger) authentication. Select the cloud that matches your tenant. The API permission request in package-solution.json must also match.'
                 })
               ]
             }
@@ -955,7 +975,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
           // Flow-specific info
           ...(authType === 'flow' ? [
             PropertyPaneLabel(`http${i}FlowInfo`, {
-              text: 'Uses AAD auth against https://service.flow.microsoft.com/. Paste your flow\'s HTTP trigger URL below. The caller\'s identity is sent automatically — the flow runs as the current user, not "anyone".'
+              text: `Uses AAD auth against ${FLOW_RESOURCE_URIS[this.properties.cloudEnvironment || 'commercial']}. Paste your flow's HTTP trigger URL below. The caller's identity is sent automatically — the flow runs as the current user, not "anyone".`
             })
           ] : []),
           // API Key-specific fields
@@ -1152,7 +1172,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
             ] : []),
             ...(httpAuthType === 'flow' ? [
               PropertyPaneLabel(`submit${i}FlowInfo`, {
-                text: 'Uses AAD auth against https://service.flow.microsoft.com/. Paste the HTTP trigger URL. The flow runs as the current user.'
+                text: `Uses AAD auth against ${FLOW_RESOURCE_URIS[this.properties.cloudEnvironment || 'commercial']}. Paste the HTTP trigger URL. The flow runs as the current user.`
               })
             ] : []),
             ...(httpAuthType === 'apiKey' ? [

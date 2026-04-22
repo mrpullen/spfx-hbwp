@@ -40,6 +40,20 @@ export interface IQueryParameter {
 export type HttpAuthType = 'aad' | 'anonymous' | 'apiKey' | 'bearer' | 'flow';
 
 /**
+ * Cloud environment for Power Automate Flow endpoints
+ */
+export type CloudEnvironment = 'commercial' | 'gcc' | 'gcchigh';
+
+/**
+ * Maps cloud environment to the Azure AD resource URI for Power Automate
+ */
+export const FLOW_RESOURCE_URIS: Record<CloudEnvironment, string> = {
+  commercial: 'https://service.flow.microsoft.com/',
+  gcc: 'https://gov.service.flow.microsoft.us/',
+  gcchigh: 'https://high.gov.service.flow.microsoft.us/'
+};
+
+/**
  * HTTP endpoint configuration for API calls with multiple auth options
  */
 export interface IHttpEndpointDataSource {
@@ -152,6 +166,8 @@ export interface IHandlebarsListViewProps {
   httpEndpoints?: IHttpEndpointDataSource[];
   /** Submit endpoints for form data */
   submitEndpoints?: ISubmitEndpoint[];
+  /** Cloud environment for Power Automate Flow endpoints */
+  cloudEnvironment?: CloudEnvironment;
   /** Handlebars template */
   template: string;
   /** Cache configuration */
