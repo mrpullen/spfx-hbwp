@@ -5,7 +5,7 @@ import Handlebars from "handlebars";
 
 import helpers from 'handlebars-helpers'
 import ReactHtmlParser from 'react-html-parser';
-import { ListDataService, IListDataResult, HttpDataService, FormSubmitService, SocialDataService, ModernPageSocialService, ITokenContext } from '../services';
+import { ListDataService, IListDataResult, HttpDataService, FormSubmitService, SocialDataService, ITokenContext } from '../services';
 import { scopeCssClasses } from './scopeCssClasses';
 
 /**
@@ -216,47 +216,6 @@ Handlebars.registerHelper('likeButton', function(this: any, itemId: any, likesCo
   );
 });
 
-// Custom helper: render a like button that uses the modern page like API (_api/sitepages/pages).
-// Use this when rendering items from a Site Pages library so likes sync with the native page UI.
-// Usage: {{likePageButton ID LikesCount LikedBy ../user.id}}
-// With color override: {{likePageButton ID LikesCount LikedBy ../user.id color="#e3008c"}}
-// With thumbs-up icon: {{likePageButton ID LikesCount LikedBy ../user.id icon="thumbsup"}}
-// Supported icons: "heart" (default), "thumbsup"
-Handlebars.registerHelper('likePageButton', function(this: any, itemId: any, likesCount: any, likedByArray: any, userId: any, options: any) {
-  const count = parseInt(likesCount, 10) || 0;
-  let liked = false;
-  if (Array.isArray(likedByArray)) {
-    liked = likedByArray.some((item: any) => {
-      const propValue = item.Id !== undefined ? item.Id : item.id;
-      return String(propValue) === String(userId);
-    });
-  }
-  const hash = options && options.hash ? options.hash : {};
-  const iconType: string = (hash.icon || 'heart').toLowerCase();
-  const icons = LIKE_ICONS[iconType] || LIKE_ICONS.heart;
-  const activeColor = hash.color || 'var(--ms-palette-neutralPrimary, #323130)';
-  const inactiveColor = 'var(--ms-semanticColors-infoIcon, #605e5c)';
-  const iconSvg = liked ? icons.fill : icons.outline;
-  const iconColor = liked ? activeColor : inactiveColor;
-  const title = liked
-    ? 'You have liked this page, click to unlike it'
-    : 'Click to like this page';
-  const label = count === 1 ? 'Like' : 'Likes';
-  const escapedId = Handlebars.Utils.escapeExpression(String(itemId));
-  const escapedActiveColor = Handlebars.Utils.escapeExpression(activeColor);
-  const escapedIconType = Handlebars.Utils.escapeExpression(iconType);
-  return new Handlebars.SafeString(
-    `<div data-hbwp-page-like="${escapedId}" data-hbwp-liked="${liked}" data-hbwp-active-color="${escapedActiveColor}" data-hbwp-icon="${escapedIconType}" ` +
-    `tabindex="0" role="button" title="${title}" ` +
-    `style="align-items:center;background:none;border-radius:2px;border:none;cursor:pointer;display:inline-flex;height:fit-content;min-height:28px;width:fit-content;padding:0;font-family:inherit">` +
-    `<div data-hbwp-heart style="align-items:center;background-color:transparent;color:${iconColor};display:flex;font-size:16px;height:28px;justify-content:center;width:28px;position:relative">` +
-    iconSvg +
-    `</div>` +
-    `<div data-hbwp-count style="font-size:12px;color:var(--ms-palette-neutralPrimary,#323130);white-space:nowrap">${count} ${label}</div>` +
-    `</div>`
-  );
-});
-
 // Custom helper: filter an array by property value (handles SharePoint lookup fields)
 Handlebars.registerHelper('filter', function(this: any, array: any[], property: string, value: any, options: any) {
   if (!Array.isArray(array)) {
@@ -399,7 +358,6 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
   private httpDataService: HttpDataService | undefined;
   private formSubmitService: FormSubmitService | undefined;
   private socialDataService: SocialDataService | undefined;
-  private modernPageSocialService: ModernPageSocialService | undefined;
   private containerRef: React.RefObject<HTMLDivElement>;
   private lastPagingNextHref: string | undefined;
 
@@ -450,13 +408,11 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     // Initialize social data service
     if (props.sp) {
       this.socialDataService = new SocialDataService(props.sp);
-      this.modernPageSocialService = new ModernPageSocialService(props.sp);
     }
 
     // Bind event handlers
     this.handleFormSubmit = this.handleFormSubmit.bind(this);
     this.handleSocialAction = this.handleSocialAction.bind(this);
-    this.handleModernPageLike = this.handleModernPageLike.bind(this);
     this.handleContainerClick = this.handleContainerClick.bind(this);
     this.handleContainerSubmit = this.handleContainerSubmit.bind(this);
     this.handlePaging = this.handlePaging.bind(this);
@@ -526,43 +482,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
   private handleContainerClick(e: Event): void {
     const target = e.target as HTMLElement;
     const likeBtn = target.closest<HTMLElement>('[data-hbwp-like]');
-    const pageLikeBtn = target.closest<HTMLElement>('[data-hbwp-page-like]');
     const rateBtn = target.closest<HTMLElement>('[data-hbwp-rate]');
-
-    // Modern page like (uses _api/sitepages/pages endpoint)
-    if (pageLikeBtn) {
-      e.preventDefault();
-      e.stopPropagation();
-      const pageItemId = pageLikeBtn.getAttribute('data-hbwp-page-like');
-      const liked = pageLikeBtn.getAttribute('data-hbwp-liked') === 'true';
-
-      // Optimistic UI — swap icon and toggle colors
-      const heartWrap = pageLikeBtn.querySelector('[data-hbwp-heart]') as HTMLElement;
-      const countEl = pageLikeBtn.querySelector('[data-hbwp-count]');
-      const activeColor = pageLikeBtn.getAttribute('data-hbwp-active-color') || 'var(--ms-palette-neutralPrimary, #323130)';
-      const inactiveColor = 'var(--ms-semanticColors-infoIcon, #605e5c)';
-      const pageLikeIcons = LIKE_ICONS[pageLikeBtn.getAttribute('data-hbwp-icon') || 'heart'] || LIKE_ICONS.heart;
-      if (heartWrap) {
-        if (liked) {
-          heartWrap.innerHTML = pageLikeIcons.outline;
-          heartWrap.style.color = inactiveColor;
-        } else {
-          heartWrap.innerHTML = pageLikeIcons.fill;
-          heartWrap.style.color = activeColor;
-        }
-      }
-      if (countEl) {
-        const current = parseInt(countEl.textContent || '0', 10) || 0;
-        const newCount = liked ? Math.max(0, current - 1) : current + 1;
-        countEl.textContent = newCount + (newCount === 1 ? ' Like' : ' Likes');
-      }
-      pageLikeBtn.setAttribute('data-hbwp-liked', liked ? 'false' : 'true');
-      pageLikeBtn.setAttribute('title', liked ? 'Click to like this page' : 'You have liked this page, click to unlike it');
-
-      // Fire modern page like API call
-      this.handleModernPageLike(pageItemId || '', liked);
-      return;
-    }
 
     if (likeBtn) {
       e.preventDefault();
@@ -700,26 +620,6 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
         })
         .catch((error: any) => console.error('Rating failed:', error));
     }
-  }
-
-  /**
-   * Handles modern page like/unlike via the _api/sitepages/pages endpoint.
-   * This uses the same REST API as the native SharePoint page like button,
-   * ensuring likes are consistent with the modern page experience.
-   */
-  private handleModernPageLike(pageItemId: string, currentlyLiked: boolean): void {
-    const siteUrl = this.props.site?.url;
-    const listId = this.props.list;
-
-    if (!this.modernPageSocialService || !siteUrl) return;
-
-    this.modernPageSocialService.toggleLike(siteUrl, Number(pageItemId), currentlyLiked)
-      .then(() => {
-        if (this.listDataService && listId) {
-          this.listDataService.clearListCache(siteUrl, listId, this.props.view || '');
-        }
-      })
-      .catch((error: any) => console.error('Modern page like toggle failed:', error));
   }
 
   /**
