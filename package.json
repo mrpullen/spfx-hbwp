@@ -27,6 +27,7 @@
     "@pnp/sp": "^4.9.0",
     "@pnp/spfx-property-controls": "^3.19.0",
     "@types/react-html-parser": "^2.0.6",
+    "caniuse-lite": "^1.0.30001790",
     "handlebars": "^4.7.8",
     "handlebars-helpers": "^0.10.0",
     "react": "17.0.1",

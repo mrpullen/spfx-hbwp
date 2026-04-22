@@ -289,6 +289,10 @@ export class ListDataService {
       }
 
       const response = await list.renderListDataAsStream(renderParams, undefined, queryMap);
+      if (pagingToken) {
+        renderParams.Paging = pagingToken;
+      }
+    
 
       // Post-process rows to nest dot-notation lookup fields into proper objects
       const items = (response.Row || []).map((row: any) => ListDataService.nestLookupFields(row));

@@ -22,6 +22,7 @@ import { IListDataSource, IHttpEndpointDataSource, IQueryParameter, ISubmitEndpo
 import { PropertyFieldSitePicker, PropertyFieldListPicker, PropertyFieldListPickerOrderBy, IPropertyFieldSite } from '@pnp/spfx-property-controls';
 import { PropertyFieldViewPicker, PropertyFieldViewPickerOrderBy } from '@pnp/spfx-property-controls/lib/PropertyFieldViewPicker';
 
+
 import { PropertyFieldCodeEditor, PropertyFieldCodeEditorLanguages } from '@pnp/spfx-property-controls/lib/PropertyFieldCodeEditor';
 import { PropertyFieldFilePicker, IFilePickerResult } from '@pnp/spfx-property-controls/lib/PropertyFieldFilePicker';
 import { spfi, SPFI, SPFx } from '@pnp/sp';
@@ -733,6 +734,96 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
                 })
               ]
             }
+          ]
+        },
+        {
+          header: {
+            description: 'Configure additional data sources with site, list, and view pickers'
+          },
+          groups: [
+            {
+              groupName: 'Manage Data Sources',
+              groupFields: [
+                PropertyPaneLabel('dataSourcesInfo', {
+                  text: `You have ${this.properties.dataSourceCount || 0} additional data source(s) configured.`
+                }),
+                PropertyPaneButton('addDataSource', {
+                  text: 'Add Data Source',
+                  buttonType: PropertyPaneButtonType.Primary,
+                  onClick: this.addDataSource.bind(this)
+                }),
+                PropertyPaneButton('removeDataSource', {
+                  text: 'Remove Last Data Source',
+                  buttonType: PropertyPaneButtonType.Normal,
+                  onClick: this.removeDataSource.bind(this),
+                  disabled: (this.properties.dataSourceCount || 0) === 0
+                }),
+                PropertyPaneLabel('dataSourcesHelp', {
+                  text: 'Access in template: {{#each keyName}}...{{/each}}. Primary list: {{#each items}}...{{/each}}. User: {{user.displayName}}. Page: {{page.Title}}. CAML filters support {{user.*}} and {{page.*}} tokens.'
+                })
+              ]
+            },
+            ...dataSourceGroups
+          ]
+        },
+        {
+          header: {
+            description: 'Configure HTTP endpoints with AAD authentication'
+          },
+          groups: [
+            {
+              groupName: 'Manage HTTP Endpoints',
+              groupFields: [
+                PropertyPaneLabel('httpEndpointsInfo', {
+                  text: `You have ${this.properties.httpEndpointCount || 0} HTTP endpoint(s) configured.`
+                }),
+                PropertyPaneButton('addHttpEndpoint', {
+                  text: 'Add HTTP Endpoint',
+                  buttonType: PropertyPaneButtonType.Primary,
+                  onClick: this.addHttpEndpoint.bind(this)
+                }),
+                PropertyPaneButton('removeHttpEndpoint', {
+                  text: 'Remove Last Endpoint',
+                  buttonType: PropertyPaneButtonType.Normal,
+                  onClick: this.removeHttpEndpoint.bind(this),
+                  disabled: (this.properties.httpEndpointCount || 0) === 0
+                }),
+                PropertyPaneLabel('httpEndpointsHelp', {
+                  text: 'Access in template: {{#each keyName}}...{{/each}}. Use tokens like {{user.email}} in URL/params.'
+                })
+              ]
+            },
+            ...httpEndpointGroups
+          ]
+        },
+        {
+          header: {
+            description: 'Configure submit endpoints for form data'
+          },
+          groups: [
+            {
+              groupName: 'Manage Submit Endpoints',
+              groupFields: [
+                PropertyPaneLabel('submitEndpointsInfo', {
+                  text: `You have ${this.properties.submitEndpointCount || 0} submit endpoint(s) configured.`
+                }),
+                PropertyPaneButton('addSubmitEndpoint', {
+                  text: 'Add Submit Endpoint',
+                  buttonType: PropertyPaneButtonType.Primary,
+                  onClick: this.addSubmitEndpoint.bind(this)
+                }),
+                PropertyPaneButton('removeSubmitEndpoint', {
+                  text: 'Remove Last Endpoint',
+                  buttonType: PropertyPaneButtonType.Normal,
+                  onClick: this.removeSubmitEndpoint.bind(this),
+                  disabled: (this.properties.submitEndpointCount || 0) === 0
+                }),
+                PropertyPaneLabel('submitEndpointsHelp', {
+                  text: 'Use in template: {{#hbwp-form endpoint="keyName"}}...{{hbwp-submit label="Submit"}}{{/hbwp-form}}'
+                })
+              ]
+            },
+            ...submitEndpointGroups
           ]
         },
         {

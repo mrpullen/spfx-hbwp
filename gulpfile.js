@@ -65,9 +65,21 @@ const restoreApiPermissions = build.subTask('restore-api-permissions', function 
   done();
 });
 
-// Merge before build, restore after
+// Merge before build, restore after (including on failure)
 build.rig.addPreBuildTask(mergeApiPermissions);
 build.rig.addPostBuildTask(restoreApiPermissions);
+
+// Safety net: restore original package-solution.json on process exit
+// (covers build failures, SIGINT, unhandled errors — any exit path)
+process.on('exit', function () {
+  if (_pkgSolutionBackup !== null) {
+    try {
+      fs.writeFileSync(PKG_SOLUTION_PATH, _pkgSolutionBackup, 'utf8');
+      _pkgSolutionBackup = null;
+      console.log('[restore-api-permissions] Restored original package-solution.json (on exit)');
+    } catch (_) { /* best-effort */ }
+  }
+});
 
 build.addSuppression(`Warning - [sass] The local CSS class 'ms-Grid' is not camelCase and will not be type-safe.`);
 

@@ -203,7 +203,6 @@ export class HttpDataService {
     if (authType === 'aad' && !appId) {
       return { data: null, fromCache: false, error: new Error('AAD auth requires appId') };
     }
-    // 'flow' auth uses the well-known Flow resource URI — no appId needed
 
     const cacheKey = this.getCacheKey(config, context);
 
