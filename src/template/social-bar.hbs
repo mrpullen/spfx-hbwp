@@ -197,29 +197,7 @@
 
             <div class="social-bar-divider"></div>
 
-            {{!-- Views count (read-only display) --}}
-            {{#if ViewsLifeTime}}
-              <span class="social-bar-btn" style="cursor: default;"
-                    aria-label="{{ViewsLifeTime}} Views">
-                <span class="sb-icon">👁</span>
-                <span>{{ViewsLifeTime}} {{#is ViewsLifeTime "1"}}View{{else}}Views{{/is}}</span>
-              </span>
-              <div class="social-bar-divider"></div>
-            {{/if}}
-
-            {{!-- Save for later / Bookmark --}}
-            <a href="{{FileRef}}"
-               class="social-bar-btn-icon"
-               title="Save this item for later"
-               aria-label="Save this item for later">
-              🔖
-            </a>
-            <a href="{{FileRef}}"
-               class="social-bar-btn"
-               title="Save for later"
-               aria-label="Save for later, open page to save">
-              <span>Save for later</span>
-            </a>
+          
 
           </aside>
         </div>
