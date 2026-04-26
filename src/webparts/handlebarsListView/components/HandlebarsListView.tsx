@@ -76,6 +76,19 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     return this._pipeline.executeWrite(key, operation, payload, this.buildBaseContext());
   };
 
+  /**
+   * executeRead delegate — non-mutating ad-hoc reads against any adapter
+   * that exposes an `executeRead` method. Does not publish bus envelopes.
+   */
+  private executeRead = async (
+    key: string,
+    operation: string,
+    payload: any
+  ): Promise<{ success: boolean; data?: any; error?: string }> => {
+    if (!this._pipeline) return { success: false, error: 'Pipeline not initialized' };
+    return this._pipeline.executeRead(key, operation, payload, this.buildBaseContext());
+  };
+
   public async componentDidMount(): Promise<void> {
     // Create a PageState instance scoped to this web part
     this._pageState = getPageState(this.props.instanceId);
@@ -91,6 +104,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       siteUrl: this.props.site?.url,
       listId: this.props.list,
       executeWrite: this.executeWrite,
+      executeRead: this.executeRead,
       userProfile: this.props.userProfile,
       pageData: this.props.pageData,
       cloudEnvironment: this.props.cloudEnvironment,
@@ -233,12 +247,13 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
 
       this.initPipeline();
 
-      // Update ServiceContext with the refreshed pipeline-backed executeWrite
+      // Update ServiceContext with the refreshed pipeline-backed delegates
       const ctx: IServiceContext = {
         instanceId: this.props.instanceId,
         siteUrl: this.props.site?.url,
         listId: this.props.list,
         executeWrite: this.executeWrite,
+        executeRead: this.executeRead,
         userProfile: this.props.userProfile,
         pageData: this.props.pageData,
         cloudEnvironment: this.props.cloudEnvironment,

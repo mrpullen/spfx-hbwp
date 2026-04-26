@@ -184,6 +184,36 @@ export class DataAdapterPipeline {
     return instance.execute(operation, payload, ctx);
   }
 
+  // ── Read operations ────────────────────────────────────────────────────
+
+  /**
+   * Execute an ad-hoc read operation on a specific adapter instance.
+   * Unlike the pipeline's batch fetch flow, this does NOT publish a
+   * `data-changed` envelope onto the bus and does NOT update any cached
+   * adapter result. The response is returned directly to the caller.
+   */
+  public async executeRead(
+    key: string,
+    operation: string,
+    payload: any,
+    context: Omit<IDataAdapterContext, 'config' | 'resolvedData'>
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    const instance = this._instances.get(key);
+    const cfg = this._configs.get(key);
+    if (!instance || !cfg) {
+      return { success: false, error: `Adapter instance '${key}' not found` };
+    }
+    if (typeof instance.executeRead !== 'function') {
+      return { success: false, error: `Adapter '${key}' does not support executeRead operations` };
+    }
+    const ctx: IDataAdapterContext = {
+      ...context,
+      config: cfg.properties || {},
+      resolvedData: {}
+    };
+    return instance.executeRead(operation, payload, ctx);
+  }
+
   /**
    * Get a specific adapter instance by key (for direct access, e.g. FormSubmitAdapter.registerEndpoints).
    */

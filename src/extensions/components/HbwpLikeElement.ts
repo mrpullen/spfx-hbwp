@@ -5,21 +5,27 @@ const HEART_OUTLINE_SVG = '<svg data-hbwp-heart-svg viewBox="0 0 16 16" width="1
 
 /**
  * <hbwp-like data-wp-id="..." data-item-id="123" data-liked="false"
- *            data-active-color="#c00" data-count="5">
+ *            data-active-color="#c00" data-count="5"
+ *            data-resolve="true">
  * </hbwp-like>
  *
  * Renders a like button with optimistic UI (heart SVG + count).
  * Calls the `_social` write adapter via ctx.executeWrite (toggleLike).
+ *
+ * If `data-resolve="true"`, the element will call ctx.executeRead('_social',
+ * 'isLiked', ...) on connect and update its own liked state + count from
+ * the server. Useful when the template can't compute liked state up front.
  */
 export class HbwpLikeElement extends BaseWebComponent {
   private _heartEl: HTMLElement | undefined;
   private _countEl: HTMLElement | undefined;
+  private _activeColor: string = 'var(--ms-palette-neutralPrimary, #323130)';
+  private _inactiveColor: string = 'var(--ms-semanticColors-infoIcon, #605e5c)';
 
   protected connectedCallback(): void {
     const liked = this.getAttribute('data-liked') === 'true';
     const count = parseInt(this.getAttribute('data-count') || '0', 10) || 0;
-    const activeColor = this.getAttribute('data-active-color') || 'var(--ms-palette-neutralPrimary, #323130)';
-    const inactiveColor = 'var(--ms-semanticColors-infoIcon, #605e5c)';
+    this._activeColor = this.getAttribute('data-active-color') || this._activeColor;
 
     this.style.cursor = 'pointer';
     this.style.display = 'inline-flex';
@@ -32,7 +38,7 @@ export class HbwpLikeElement extends BaseWebComponent {
     // Heart icon
     this._heartEl = document.createElement('span');
     this._heartEl.innerHTML = liked ? HEART_FILL_SVG : HEART_OUTLINE_SVG;
-    this._heartEl.style.color = liked ? activeColor : inactiveColor;
+    this._heartEl.style.color = liked ? this._activeColor : this._inactiveColor;
     this._heartEl.style.display = 'inline-flex';
     this.appendChild(this._heartEl);
 
@@ -43,6 +49,41 @@ export class HbwpLikeElement extends BaseWebComponent {
 
     this.addEventListener('click', this._onClick);
     this.addEventListener('keydown', this._onKeydown);
+
+    // Optionally resolve liked state from the server
+    if (this.getAttribute('data-resolve') === 'true') {
+      this._resolveLiked();
+    }
+  }
+
+  /**
+   * Query the `_social` adapter for current liked state + count and update
+   * the UI. Used when the template can't pre-compute liked state.
+   */
+  private _resolveLiked(): void {
+    const ctx = this.getServiceContext();
+    const itemId = this.getAttribute('data-item-id');
+    if (!ctx || !ctx.executeRead || !ctx.siteUrl || !ctx.listId || !itemId) return;
+
+    ctx.executeRead('_social', 'isLiked', { siteUrl: ctx.siteUrl, listId: ctx.listId, itemId: Number(itemId) })
+      .then((result) => {
+        if (!result.success || !result.data) return;
+        const liked = !!result.data.liked;
+        const count = typeof result.data.count === 'number' ? result.data.count : 0;
+        this.setAttribute('data-liked', String(liked));
+        this.setAttribute('data-count', String(count));
+        this.setAttribute('title', liked ? 'You have liked this item, click to unlike it' : 'Click to like this item');
+        if (this._heartEl) {
+          this._heartEl.innerHTML = liked ? HEART_FILL_SVG : HEART_OUTLINE_SVG;
+          this._heartEl.style.color = liked ? this._activeColor : this._inactiveColor;
+        }
+        if (this._countEl) {
+          this._countEl.textContent = count + (count === 1 ? ' Like' : ' Likes');
+        }
+      })
+      .catch((err: Error) => {
+        console.error('[hbwp-like] isLiked lookup failed:', err);
+      });
   }
 
   private _onClick = (e: Event): void => {
@@ -63,8 +104,6 @@ export class HbwpLikeElement extends BaseWebComponent {
     const ctx = this.getServiceContext();
     const itemId = this.getAttribute('data-item-id');
     const liked = this.getAttribute('data-liked') === 'true';
-    const activeColor = this.getAttribute('data-active-color') || 'var(--ms-palette-neutralPrimary, #323130)';
-    const inactiveColor = 'var(--ms-semanticColors-infoIcon, #605e5c)';
 
     if (!ctx || !ctx.executeWrite || !ctx.siteUrl || !ctx.listId || !itemId) {
       console.warn('[hbwp-like] Missing service context, executeWrite, siteUrl, listId, or itemId');
@@ -78,7 +117,7 @@ export class HbwpLikeElement extends BaseWebComponent {
 
     if (this._heartEl) {
       this._heartEl.innerHTML = newLiked ? HEART_FILL_SVG : HEART_OUTLINE_SVG;
-      this._heartEl.style.color = newLiked ? activeColor : inactiveColor;
+      this._heartEl.style.color = newLiked ? this._activeColor : this._inactiveColor;
     }
     if (this._countEl) {
       const current = parseInt(this._countEl.textContent || '0', 10) || 0;
@@ -94,7 +133,7 @@ export class HbwpLikeElement extends BaseWebComponent {
         this.setAttribute('data-liked', String(liked));
         if (this._heartEl) {
           this._heartEl.innerHTML = liked ? HEART_FILL_SVG : HEART_OUTLINE_SVG;
-          this._heartEl.style.color = liked ? activeColor : inactiveColor;
+          this._heartEl.style.color = liked ? this._activeColor : this._inactiveColor;
         }
       });
   }

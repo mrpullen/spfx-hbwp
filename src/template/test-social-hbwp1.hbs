@@ -1,0 +1,86 @@
+{{!--
+  TEST: HBWP #1 — Item Picker (Publisher) + Pager
+  ================================================
+  Pairs with: test-social-hbwp2.hbs (HBWP #2)
+
+  Validates:
+    ✓ MessageBus publish (data-hbwp-action / data-hbwp-topic / data-hbwp-item)
+    ✓ <hbwp-pager> default data-topic="items" (today's change)
+    ✓ <hbwp-pager data-topic="..."> override
+
+  Setup (HBWP #1):
+    - Point at any SharePoint list (Title + ID minimum)
+    - Property pane → Dynamic Data → Publish Topics:
+        Topic: "selectedItem"   Action: select   Enabled: ✓
+    - Place test-social-hbwp2 (HBWP #2) on the same page
+
+  What to verify:
+    ✓ Click a row → HBWP #2 paints like/rate controls for that ID
+    ✓ "Next ▶" / "◀ Prev" pager (no data-topic) advances the primary list
+    ✓ If a second data source (e.g. "roster") is configured, the second
+      pager block targets it via data-topic="roster"
+--}}
+
+<style>
+  .hbwp1-{{wpId}} { font-family: var(--body-font, 'Segoe UI', sans-serif); padding: 16px; }
+  .hbwp1-{{wpId}} h3 { margin: 0 0 12px; color: #0078d4; border-bottom: 2px solid #0078d4; padding-bottom: 6px; }
+  .hbwp1-{{wpId}} table { width: 100%; border-collapse: collapse; }
+  .hbwp1-{{wpId}} th { text-align: left; padding: 8px 12px; background: #f3f2f1; font-size: 13px; }
+  .hbwp1-{{wpId}} td { padding: 8px 12px; border-bottom: 1px solid #edebe9; font-size: 14px; }
+  .hbwp1-{{wpId}} tr[data-hbwp-action] { cursor: pointer; }
+  .hbwp1-{{wpId}} tr[data-hbwp-action]:hover { background: #f3f2f1; }
+  .hbwp1-{{wpId}} .pager-{{wpId}} {
+    display: inline-block; margin: 12px 6px 0 0; padding: 6px 14px;
+    background: #0078d4; color: #fff; border-radius: 4px; cursor: pointer;
+    font-size: 13px; user-select: none;
+  }
+  .hbwp1-{{wpId}} .pager-{{wpId}}[data-disabled="true"] { background: #c8c6c4; cursor: not-allowed; }
+  .hbwp1-{{wpId}} .pager-alt-{{wpId}} { background: #5c2d91; }
+  .hbwp1-{{wpId}} .roster-{{wpId}} { margin-top: 24px; padding-top: 16px; border-top: 1px dashed #c8c6c4; }
+  .hbwp1-{{wpId}} .roster-{{wpId}} h4 { margin: 0 0 8px; color: #5c2d91; font-size: 14px; }
+</style>
+
+<div class="hbwp1-{{wpId}}">
+  <h3>HBWP #1 — Pick an item to like / rate in HBWP #2</h3>
+
+  {{#if items.rows.length}}
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Title</th><th>Modified</th></tr>
+      </thead>
+      <tbody>
+        {{#each items.rows}}
+          <tr data-hbwp-action="select"
+              data-hbwp-topic="selectedItem"
+              data-hbwp-item='{{json this}}'>
+            <td>{{ID}}</td>
+            <td>{{Title}}</td>
+            <td>{{Modified}}</td>
+          </tr>
+        {{/each}}
+      </tbody>
+    </table>
+
+    {{!-- Pager — default data-topic=items (NEW: optional in v2) --}}
+    <hbwp-pager class="pager-{{wpId}}" data-direction="prev">◀ Prev</hbwp-pager>
+    <hbwp-pager class="pager-{{wpId}}" data-direction="next">Next ▶</hbwp-pager>
+  {{else}}
+    <p>No items in the primary list. Configure a list in the property pane.</p>
+  {{/if}}
+
+  {{!--
+    OPTIONAL: second data source named "roster" with its own pager.
+    Configure another data source (sharepoint-list) with key="roster" to test
+    the data-topic override path.
+  --}}
+  {{#if roster.rows.length}}
+    <div class="roster-{{wpId}}">
+      <h4>Roster (data-topic="roster")</h4>
+      <ul>
+        {{#each roster.rows}}<li>#{{ID}} — {{Title}}</li>{{/each}}
+      </ul>
+      <hbwp-pager class="pager-{{wpId}} pager-alt-{{wpId}}" data-topic="roster" data-direction="prev">◀ Roster Prev</hbwp-pager>
+      <hbwp-pager class="pager-{{wpId}} pager-alt-{{wpId}}" data-topic="roster" data-direction="next">Roster Next ▶</hbwp-pager>
+    </div>
+  {{/if}}
+</div>

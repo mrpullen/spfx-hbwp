@@ -17,6 +17,16 @@ export interface ISocialActionResult {
 }
 
 /**
+ * Result of an isLiked lookup.
+ */
+export interface IIsLikedResult {
+  success: boolean;
+  liked?: boolean;
+  count?: number;
+  error?: string;
+}
+
+/**
  * Service for handling social interactions (likes, ratings) on SharePoint list items.
  * Uses PnPjs v4 .like(), .unlike(), and .rate() methods via @pnp/sp/comments/item.
  */
@@ -86,6 +96,38 @@ export class SocialDataService {
       return { success: true };
     } catch (error) {
       console.error(`SocialDataService: Error rating item ${itemId}:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+
+  /**
+   * Check whether the current user has liked a list item, and return the
+   * total like count. Uses SharePoint's LikedByInformation field.
+   */
+  public async isLiked(
+    siteUrl: string,
+    listId: string,
+    itemId: number
+  ): Promise<IIsLikedResult> {
+    try {
+      const targetSp = spfi(siteUrl).using(AssignFrom(this.sp.web));
+      const item = targetSp.web.lists.getById(listId).items.getById(itemId);
+
+      const result: any = await item
+        .select('LikedByInformation/IsLikedByUser', 'LikedByInformation/LikeCount')
+        .expand('LikedByInformation')();
+
+      const info = result?.LikedByInformation || {};
+      return {
+        success: true,
+        liked: !!info.IsLikedByUser,
+        count: typeof info.LikeCount === 'number' ? info.LikeCount : 0
+      };
+    } catch (error) {
+      console.error(`SocialDataService: Error checking isLiked on item ${itemId}:`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error)

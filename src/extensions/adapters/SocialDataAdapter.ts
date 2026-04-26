@@ -19,6 +19,7 @@ import { SocialDataService } from '../services/SocialDataService';
  * Supported operations:
  *  - execute('toggleLike', { siteUrl, listId, itemId, currentlyLiked })
  *  - execute('rate',       { siteUrl, listId, itemId, value })
+ *  - executeRead('isLiked', { siteUrl, listId, itemId }) → { liked, count }
  */
 export class SocialDataAdapter extends DataAdapterBase {
   public readonly adapterId = 'social';
@@ -62,6 +63,28 @@ export class SocialDataAdapter extends DataAdapterBase {
 
       default:
         return { success: false, error: `Unknown social operation: ${operation}` };
+    }
+  }
+
+  public async executeRead(
+    operation: string,
+    payload: any,
+    _context: IDataAdapterContext
+  ): Promise<IDataAdapterWriteResult> {
+    switch (operation) {
+      case 'isLiked': {
+        const { siteUrl, listId, itemId } = payload || {};
+        if (!siteUrl || !listId || !itemId) {
+          return { success: false, error: 'isLiked requires siteUrl, listId, and itemId' };
+        }
+        const result = await this.inner.isLiked(siteUrl, listId, Number(itemId));
+        return result.success
+          ? { success: true, data: { liked: result.liked, count: result.count } }
+          : { success: false, error: result.error };
+      }
+
+      default:
+        return { success: false, error: `Unknown social read operation: ${operation}` };
     }
   }
 

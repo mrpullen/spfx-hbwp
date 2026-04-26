@@ -1,0 +1,96 @@
+{{!--
+  TEST: HBWP #2 — Like / Rate Subscriber
+  =======================================
+  Pairs with: test-social-hbwp1.hbs (HBWP #1)
+
+  Validates:
+    ✓ MessageBus subscribe ({{incoming.*}} resolves selected item)
+    ✓ <hbwp-like data-resolve="true">     → executeRead('_social','isLiked')
+    ✓ <hbwp-like> click                    → executeWrite('_social','toggleLike')
+    ✓ <hbwp-rate data-value="N">           → executeWrite('_social','rate')
+    ✓ Service context propagation across web part instances
+
+  Setup (HBWP #2):
+    - Point at the SAME list as HBWP #1 (siteUrl + listId must match)
+      OR leave list config minimal — it just needs the list GUID for the
+      social adapter; the row data comes from HBWP #1 via the bus.
+    - Property pane → Dynamic Data → Subscribe Topics:
+        Topic: "selectedItem"   Context Key: "incoming"   On Receive: Merge   Enabled: ✓
+
+  What to verify:
+    ✓ Before any pick: shows "Waiting for selection" placeholder
+    ✓ After picking a row in HBWP #1: like/rate controls appear for that ID
+    ✓ <hbwp-like data-resolve="true"> hits the server and paints the correct
+      liked-state + count without the template providing data-liked / data-count
+    ✓ Clicking the heart toggles like (optimistic UI; reverts on error)
+    ✓ Clicking 1–5 stars submits the rating
+    ✓ Open DevTools Network tab — confirm:
+        - One LikedByInformation GET on selection (executeRead)
+        - POST/DELETE on heart click (toggleLike)
+        - POST on star click (rate)
+--}}
+
+<style>
+  .hbwp2-{{wpId}} { font-family: var(--body-font, 'Segoe UI', sans-serif); padding: 16px; }
+  .hbwp2-{{wpId}} h3 { margin: 0 0 12px; color: #107c10; border-bottom: 2px solid #107c10; padding-bottom: 6px; }
+  .hbwp2-{{wpId}} .placeholder-{{wpId}} {
+    text-align: center; padding: 40px 20px; color: #a19f9d;
+    border: 2px dashed #e1dfdd; border-radius: 8px;
+  }
+  .hbwp2-{{wpId}} .card-{{wpId}} {
+    padding: 16px; background: #fafafa; border: 1px solid #e1dfdd; border-radius: 8px;
+  }
+  .hbwp2-{{wpId}} .row-{{wpId}} {
+    display: flex; align-items: center; gap: 16px; margin: 12px 0;
+    padding: 8px 0; border-bottom: 1px solid #edebe9;
+  }
+  .hbwp2-{{wpId}} .row-{{wpId}}:last-child { border-bottom: none; }
+  .hbwp2-{{wpId}} .label-{{wpId}} { width: 110px; font-size: 12px; color: #605e5c; text-transform: uppercase; }
+  .hbwp2-{{wpId}} .stars-{{wpId}} hbwp-rate {
+    cursor: pointer; font-size: 22px; padding: 0 3px; color: #ffb900;
+    user-select: none;
+  }
+  .hbwp2-{{wpId}} .stars-{{wpId}} hbwp-rate:hover { transform: scale(1.2); }
+  .hbwp2-{{wpId}} .meta-{{wpId}} { font-size: 12px; color: #605e5c; margin-top: 8px; }
+</style>
+
+<div class="hbwp2-{{wpId}}">
+  <h3>HBWP #2 — Like &amp; Rate</h3>
+
+  {{#if incoming.ID}}
+    <div class="card-{{wpId}}">
+      <div style="font-size: 16px; font-weight: 600;">#{{incoming.ID}} — {{incoming.Title}}</div>
+
+      {{!-- Like — self-resolves via executeRead('_social','isLiked') --}}
+      <div class="row-{{wpId}}">
+        <span class="label-{{wpId}}">Like</span>
+        <hbwp-like data-wp-id="{{wpId}}"
+                   data-item-id="{{incoming.ID}}"
+                   data-resolve="true"
+                   data-active-color="#c00"></hbwp-like>
+      </div>
+
+      {{!-- Rate — five stars, each writes a different value --}}
+      <div class="row-{{wpId}}">
+        <span class="label-{{wpId}}">Rate</span>
+        <span class="stars-{{wpId}}">
+          <hbwp-rate data-wp-id="{{wpId}}" data-item-id="{{incoming.ID}}" data-value="1" title="1 star">★</hbwp-rate>
+          <hbwp-rate data-wp-id="{{wpId}}" data-item-id="{{incoming.ID}}" data-value="2" title="2 stars">★</hbwp-rate>
+          <hbwp-rate data-wp-id="{{wpId}}" data-item-id="{{incoming.ID}}" data-value="3" title="3 stars">★</hbwp-rate>
+          <hbwp-rate data-wp-id="{{wpId}}" data-item-id="{{incoming.ID}}" data-value="4" title="4 stars">★</hbwp-rate>
+          <hbwp-rate data-wp-id="{{wpId}}" data-item-id="{{incoming.ID}}" data-value="5" title="5 stars">★</hbwp-rate>
+        </span>
+      </div>
+
+      <div class="meta-{{wpId}}">
+        Item received via MessageBus from HBWP #1 — siteUrl and listId on the
+        ServiceContext drive the social API calls.
+      </div>
+    </div>
+  {{else}}
+    <div class="placeholder-{{wpId}}">
+      <p>Waiting for selection…</p>
+      <p style="font-size: 12px;">Click a row in HBWP #1 to load like/rate controls here.</p>
+    </div>
+  {{/if}}
+</div>
