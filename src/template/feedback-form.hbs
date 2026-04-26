@@ -13,14 +13,14 @@
   - Configure the URL, auth type, and method (POST)
   - The endpoint will receive JSON with form field values
   
-  Available helpers:
-  - {{#hbwp-form}} - Creates a form bound to a submit endpoint
-  - {{hbwp-input}} - Creates a Fluent UI text field
-  - {{hbwp-textarea}} - Creates a Fluent UI textarea
-  - {{hbwp-select}} - Creates a Fluent UI select dropdown
-  - {{hbwp-checkbox}} - Creates a Fluent UI checkbox
-  - {{hbwp-hidden}} - Creates a hidden input
-  - {{hbwp-submit}} - Creates a submit button
+  Available web components (form elements are now custom elements):
+  - <hbwp-form> - Form container bound to a submit endpoint
+  - <hbwp-input> - Fluent UI text field
+  - <hbwp-textarea> - Fluent UI textarea
+  - <hbwp-select> - Fluent UI select dropdown
+  - <hbwp-checkbox> - Fluent UI checkbox
+  - <hbwp-hidden> - Hidden input
+  - <hbwp-submit> - Submit button
 --}}
 
 <style>
@@ -154,65 +154,70 @@
   <div id="formMessage" class="form-message"></div>
   
   {{!-- The form - bound to the "submitFeedback" endpoint --}}
-  {{#hbwp-form endpoint="submitFeedback" id="feedbackForm"}}
+  <hbwp-form data-endpoint="submitFeedback" data-wp-id="{{wpId}}" id="feedbackForm">
     
     {{!-- Hidden field to capture submitter email --}}
-    {{hbwp-hidden name="SubmitterEmail" value=userProfile.Email}}
+    <hbwp-hidden name="SubmitterEmail" value="{{userProfile.Email}}"></hbwp-hidden>
     
     <div class="form-row">
-      {{hbwp-input 
+      <hbwp-input 
         name="Title" 
         label="Subject" 
         placeholder="Brief description of your feedback"
-        required=true
-        maxlength=255
-      }}
+        required
+        maxlength="255"
+      ></hbwp-input>
     </div>
     
     <div class="form-row-inline">
-      {{hbwp-select 
+      <hbwp-select 
         name="Category" 
         label="Category"
-        required=true
-        options="Bug|Feature Request|General Feedback|Question"
-      }}
+        required>
+        <fluent-option value="Bug">Bug</fluent-option>
+        <fluent-option value="Feature Request">Feature Request</fluent-option>
+        <fluent-option value="General Feedback">General Feedback</fluent-option>
+        <fluent-option value="Question">Question</fluent-option>
+      </hbwp-select>
       
-      {{hbwp-select 
+      <hbwp-select 
         name="Priority" 
         label="Priority"
-        required=true
-        options="Low|Medium|High"
-      }}
+        required>
+        <fluent-option value="Low">Low</fluent-option>
+        <fluent-option value="Medium">Medium</fluent-option>
+        <fluent-option value="High">High</fluent-option>
+      </hbwp-select>
     </div>
     
     <div class="form-row">
-      {{hbwp-textarea 
+      <hbwp-textarea 
         name="Description" 
         label="Description" 
         placeholder="Please provide as much detail as possible..."
-        rows=6
-        required=true
-      }}
+        rows="6"
+        required
+      ></hbwp-textarea>
     </div>
     
     <div class="form-row">
-      {{hbwp-checkbox 
+      <hbwp-checkbox 
         name="ContactMe" 
         label="I'd like to be contacted about this feedback"
-      }}
+      ></hbwp-checkbox>
     </div>
     
     {{!-- Status field - default to "New" for new submissions --}}
-    {{hbwp-hidden name="Status" value="New"}}
+    <hbwp-hidden name="Status" value="New"></hbwp-hidden>
     
     <div class="form-actions">
       <fluent-button appearance="secondary" type="button" onclick="this.closest('form').reset()">
         Clear
       </fluent-button>
-      {{hbwp-submit label="Submit Feedback" appearance="primary"}}
+      <hbwp-submit label="Submit Feedback" appearance="primary"></hbwp-submit>
     </div>
     
-  {{/hbwp-form}}
+  </hbwp-form>
 </div>
 
 <script>

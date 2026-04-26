@@ -1,0 +1,83 @@
+{{!-- 
+  TEST: Bidirectional — Table ↔ Edit Form (Full Loop)
+  =====================================================
+  Tests: Bidirectional pub/sub, select → prefill → submit → refresh cycle
+  
+  This template tests the PUBLISHER side of a bidirectional flow.
+  It publishes row selection AND subscribes to refresh notifications.
+  
+  Setup:
+  - List: Any writable SharePoint list
+  - Property pane → Dynamic Data → Publish Topics:
+      Topic: "editItem"    Action: Select   Enabled: ✓
+  - Property pane → Dynamic Data → Subscribe Topics:
+      Topic: "itemSaved"   Context Key: "_refresh"   On Receive: Refresh   Enabled: ✓
+  - Place test-bus-edit-form on the same page pointed at the SAME list
+  
+  What to verify:
+  ✓ Click row → "editItem" published → form pre-fills
+  ✓ Edit form saves → "itemSaved" published → THIS table refreshes
+  ✓ Updated data visible in table after refresh
+  ✓ Full round-trip: click → edit → save → see updated row
+  ✓ Debounced refresh: rapid saves don't hammer SharePoint
+--}}
+
+<style>
+  .bidi-table-{{wpId}} {
+    font-family: var(--body-font, 'Segoe UI', sans-serif);
+    padding: 16px;
+  }
+  .bidi-table-header-{{wpId}} {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #0078d4;
+  }
+  .bidi-table-title-{{wpId}} { font-size: 18px; font-weight: 600; color: #0078d4; margin: 0; }
+  .bidi-badges-{{wpId}} { display: flex; gap: 6px; }
+  .bidi-badge-pub-{{wpId}} {
+    font-size: 10px; background: #0078d4; color: #fff; padding: 2px 6px;
+    border-radius: 10px;
+  }
+  .bidi-badge-sub-{{wpId}} {
+    font-size: 10px; background: #107c10; color: #fff; padding: 2px 6px;
+    border-radius: 10px;
+  }
+  .bidi-tbl-{{wpId}} { width: 100%; border-collapse: collapse; }
+  .bidi-tbl-{{wpId}} th {
+    text-align: left; padding: 8px 12px; background: #f3f2f1;
+    border-bottom: 2px solid #e1dfdd; font-size: 13px; color: #605e5c;
+  }
+  .bidi-tbl-{{wpId}} td { padding: 8px 12px; border-bottom: 1px solid #edebe9; }
+  .bidi-tbl-{{wpId}} tr[data-hbwp-action] { cursor: pointer; }
+  .bidi-tbl-{{wpId}} tr[data-hbwp-action]:hover { background: #deecf9; }
+</style>
+
+<div class="bidi-table-{{wpId}}">
+  <div class="bidi-table-header-{{wpId}}">
+    <h3 class="bidi-table-title-{{wpId}}">Items (click to edit)</h3>
+    <div class="bidi-badges-{{wpId}}">
+      <span class="bidi-badge-pub-{{wpId}}">PUB → editItem</span>
+      <span class="bidi-badge-sub-{{wpId}}">SUB ← itemSaved</span>
+    </div>
+  </div>
+
+  {{#if items.rows.length}}
+  <table class="bidi-tbl-{{wpId}}">
+    <thead>
+      <tr><th>ID</th><th>Title</th><th>Modified</th></tr>
+    </thead>
+    <tbody>
+      {{#each items.rows}}
+      <tr data-hbwp-action="select"
+          data-hbwp-topic="editItem"
+          data-hbwp-item='{{json this}}'>
+        <td>{{ID}}</td>
+        <td>{{Title}}</td>
+        <td>{{Modified}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+  {{else}}
+  <p>No items. Add some via the form!</p>
+  {{/if}}
+</div>

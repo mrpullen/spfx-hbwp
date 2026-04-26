@@ -1,0 +1,87 @@
+{{!-- 
+  TEST: Bidirectional — Edit Form (receives select, publishes refresh)
+  =====================================================================
+  Tests: incoming.* pre-fill, form data-topic publish, guard pattern for empty state
+  
+  Pair with test-bus-bidi-table.hbs for the full bidirectional test.
+  
+  Setup:
+  - List: Same writable list as the bidi-table
+  - Property pane → Submit Endpoints:
+      Key: "updateItem"   Type: SharePoint   List: (same list)
+  - Property pane → Dynamic Data → Subscribe Topics:
+      Topic: "editItem"   Context Key: "incoming"   On Receive: Merge   Enabled: ✓
+  
+  What to verify:
+  ✓ Before any click: shows "Select an item to edit" placeholder
+  ✓ After row click in table: form pre-fills with {{incoming.Title}}
+  ✓ Edit and save → item updated in SharePoint
+  ✓ On success → publishes "itemSaved" action:"submit" → table refreshes
+  ✓ Guard pattern: {{#if incoming.ID}} controls form visibility
+--}}
+
+<style>
+  .bidi-form-{{wpId}} {
+    font-family: var(--body-font, 'Segoe UI', sans-serif);
+    padding: 16px;
+  }
+  .bidi-form-header-{{wpId}} {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #ca5010;
+  }
+  .bidi-form-title-{{wpId}} { font-size: 18px; font-weight: 600; color: #ca5010; margin: 0; }
+  .bidi-form-badges-{{wpId}} { display: flex; gap: 6px; }
+  .bidi-form-badge-sub-{{wpId}} {
+    font-size: 10px; background: #107c10; color: #fff; padding: 2px 6px; border-radius: 10px;
+  }
+  .bidi-form-badge-pub-{{wpId}} {
+    font-size: 10px; background: #ca5010; color: #fff; padding: 2px 6px; border-radius: 10px;
+  }
+  .bidi-form-placeholder-{{wpId}} {
+    text-align: center; padding: 40px 20px; color: #a19f9d;
+    border: 2px dashed #e1dfdd; border-radius: 8px;
+  }
+  .bidi-form-editing-{{wpId}} {
+    background: #fff4ce; border: 1px solid #ffb900; border-radius: 4px;
+    padding: 6px 12px; margin-bottom: 12px; font-size: 13px;
+  }
+</style>
+
+<div class="bidi-form-{{wpId}}">
+  <div class="bidi-form-header-{{wpId}}">
+    <h3 class="bidi-form-title-{{wpId}}">Edit Item</h3>
+    <div class="bidi-form-badges-{{wpId}}">
+      <span class="bidi-form-badge-sub-{{wpId}}">SUB ← editItem</span>
+      <span class="bidi-form-badge-pub-{{wpId}}">PUB → itemSaved</span>
+    </div>
+  </div>
+
+  {{#if incoming.ID}}
+    <div class="bidi-form-editing-{{wpId}}">
+      ✏️ Editing item #{{incoming.ID}}: <strong>{{incoming.Title}}</strong>
+    </div>
+
+    <hbwp-smart-form
+      data-wp-id="{{wpId}}"
+      data-endpoint="updateItem"
+      data-success-message="Item updated!"
+      data-submit-label="Save Changes"
+      data-topic="itemSaved"
+      data-topic-action="submit"
+    >
+      <hbwp-field data-name="ID" data-type="hidden"
+                 data-default-value="{{incoming.ID}}" />
+      <hbwp-field data-name="Title" data-type="text" data-label="Title"
+                 data-default-value="{{incoming.Title}}" data-required="true" />
+    </hbwp-smart-form>
+
+  {{else}}
+    <div class="bidi-form-placeholder-{{wpId}}">
+      <p style="font-size: 24px;">✏️</p>
+      <p>Select an item from the table to edit it.</p>
+      <p style="font-size: 12px; color: #c8c6c4;">
+        Listening on topic: editItem → context key: incoming
+      </p>
+    </div>
+  {{/if}}
+</div>

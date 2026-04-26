@@ -1,0 +1,95 @@
+{{!-- 
+  TEST: MessageBus Publisher (Table with Row Click)
+  ==================================================
+  Tests: data-hbwp-action, data-hbwp-topic, data-hbwp-item, {{json}} helper
+  
+  Setup:
+  - Point at ANY SharePoint list (needs Title, ID at minimum)
+  - Property pane → Dynamic Data → Publish Topics:
+      Topic: "selectedItem"   Action: Select   Enabled: ✓
+  - Place test-bus-subscriber on the same page
+  
+  What to verify:
+  ✓ Clicking a row publishes to MessageBus (check console: no errors)
+  ✓ The subscriber web part receives and displays the selected item
+  ✓ data-hbwp-item correctly serializes the row via {{json this}}
+  ✓ Clear button sends action:'clear' and subscriber resets
+--}}
+
+<style>
+  .pub-container-{{wpId}} {
+    font-family: var(--body-font, 'Segoe UI', sans-serif);
+    padding: 16px;
+  }
+  .pub-header-{{wpId}} {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #0078d4;
+  }
+  .pub-title-{{wpId}} { font-size: 18px; font-weight: 600; color: #0078d4; margin: 0; }
+  .pub-badge-{{wpId}} {
+    font-size: 11px; background: #0078d4; color: #fff; padding: 2px 8px;
+    border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .pub-table-{{wpId}} { width: 100%; border-collapse: collapse; }
+  .pub-table-{{wpId}} th {
+    text-align: left; padding: 8px 12px; background: #f3f2f1;
+    border-bottom: 2px solid #e1dfdd; font-size: 13px; color: #605e5c;
+  }
+  .pub-table-{{wpId}} td { padding: 8px 12px; border-bottom: 1px solid #edebe9; font-size: 14px; }
+  .pub-table-{{wpId}} tr[data-hbwp-action] {
+    cursor: pointer; transition: background 0.15s;
+  }
+  .pub-table-{{wpId}} tr[data-hbwp-action]:hover { background: #f3f2f1; }
+  .pub-clear-{{wpId}} {
+    margin-top: 12px; padding: 6px 16px; border: 1px solid #8a8886;
+    background: #fff; border-radius: 4px; cursor: pointer; font-size: 13px;
+  }
+  .pub-clear-{{wpId}}:hover { background: #f3f2f1; }
+  .pub-info-{{wpId}} {
+    margin-top: 8px; font-size: 12px; color: #605e5c; font-style: italic;
+  }
+</style>
+
+<div class="pub-container-{{wpId}}">
+  <div class="pub-header-{{wpId}}">
+    <h3 class="pub-title-{{wpId}}">Publisher — Click a Row</h3>
+    <span class="pub-badge-{{wpId}}">PUB → selectedItem</span>
+  </div>
+
+  {{#if items.rows.length}}
+  <table class="pub-table-{{wpId}}">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Title</th>
+        <th>Created</th>
+        <th>Author</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each items.rows}}
+      <tr data-hbwp-action="select"
+          data-hbwp-topic="selectedItem"
+          data-hbwp-item='{{json this}}'>
+        <td>{{ID}}</td>
+        <td>{{Title}}</td>
+        <td>{{Created}}</td>
+        <td>{{Author.title}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+
+  <button class="pub-clear-{{wpId}}"
+          data-hbwp-action="clear"
+          data-hbwp-topic="selectedItem">
+    ✕ Clear Selection
+  </button>
+
+  <div class="pub-info-{{wpId}}">
+    {{items.rows.length}} rows loaded · Topic: selectedItem · Instance: {{wpId}}
+  </div>
+  {{else}}
+  <p>No items found. Configure a list/view in the property pane.</p>
+  {{/if}}
+</div>

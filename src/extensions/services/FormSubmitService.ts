@@ -5,7 +5,7 @@ import "@pnp/sp/webs";
 import "@pnp/sp/lists";
 import "@pnp/sp/items";
 import { AadHttpClient, AadHttpClientFactory, HttpClient, HttpClientResponse, IHttpClientOptions } from '@microsoft/sp-http';
-import { ISubmitEndpoint } from '../components/IHandlebarsListViewProps';
+import { ISubmitEndpoint } from '../../webparts/handlebarsListView/components/IHandlebarsListViewProps';
 
 /** Default Azure AD resource URI used to acquire tokens for Power Automate HTTP-triggered flows */
 const DEFAULT_FLOW_RESOURCE_URI = 'https://service.flow.microsoft.com/';

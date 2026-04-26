@@ -2,6 +2,8 @@ import { SPFI } from "@pnp/sp";
 import { IPropertyFieldSite } from "@pnp/spfx-property-controls";
 import { AadHttpClientFactory, HttpClient } from "@microsoft/sp-http";
 import { IUserProfile } from "../services";
+import { ExtensibilityService } from "../services/ExtensibilityService";
+import { IMessageBus, IPlatformServices, IDataAdapterInstanceConfig } from "@mrpullen/spfx-extensibility";
 
 /**
  * Configuration for a single list data source
@@ -178,4 +180,18 @@ export interface IHandlebarsListViewProps {
   pageData?: Record<string, any>;
   /** Web part instance ID for unique cache keys */
   instanceId: string;
+  /** Extensibility service for custom web components and Handlebars helpers */
+  extensibilityService?: ExtensibilityService;
+  /** Selected template engine ID (e.g. 'handlebars', 'vue') */
+  templateEngine?: string;
+  /** MessageBus singleton for pub/sub */
+  messageBus?: IMessageBus;
+  /** SPFx Dynamic Data: single incoming item from a connected source */
+  incomingItem?: Record<string, any>;
+  /** SPFx Dynamic Data: incoming items array from a connected source */
+  incomingItems?: Record<string, any>[];
+  /** Platform services bag for data adapter DI */
+  platformServices?: IPlatformServices;
+  /** Data adapter instance configurations */
+  adapterConfigs?: IDataAdapterInstanceConfig[];
 }

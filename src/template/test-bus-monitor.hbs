@@ -1,0 +1,149 @@
+{{!-- 
+  TEST: MessageBus Debug Monitor
+  ================================
+  Tests: Multi-topic subscription, raw envelope inspection, late-joiner catch-up
+  
+  A diagnostic template that subscribes to ALL test topics and displays
+  every incoming envelope as raw JSON. Use this alongside any other test
+  template to verify messages are flowing correctly.
+  
+  Setup:
+  - List: None needed (or any list — data is irrelevant)
+  - Property pane → Dynamic Data → Subscribe Topics:
+      Topic: "selectedItem"     Context Key: "selectedItem"     On Receive: Merge   Enabled: ✓
+      Topic: "filterCategory"   Context Key: "filterCategory"   On Receive: Merge   Enabled: ✓
+      Topic: "itemUpdated"      Context Key: "itemUpdated"      On Receive: Merge   Enabled: ✓
+      Topic: "editItem"         Context Key: "editItem"         On Receive: Merge   Enabled: ✓
+      Topic: "itemSaved"        Context Key: "itemSaved"        On Receive: Merge   Enabled: ✓
+  
+  What to verify:
+  ✓ Each topic shows its last received data (or "no data" if nothing received)
+  ✓ Multiple topics can be active simultaneously
+  ✓ Data updates when new messages arrive
+  ✓ Context keys are isolated (selectedItem doesn't overwrite filterCategory)
+  ✓ Late-joiner: if this WP loads after a message was published,
+    lastMessage() catch-up should populate the context
+--}}
+
+<style>
+  .monitor-{{wpId}} {
+    font-family: var(--body-font, 'Segoe UI', sans-serif);
+    padding: 16px;
+  }
+  .monitor-header-{{wpId}} {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #5c2d91;
+  }
+  .monitor-title-{{wpId}} { font-size: 18px; font-weight: 600; color: #5c2d91; margin: 0; }
+  .monitor-topic-{{wpId}} {
+    margin-bottom: 16px; border: 1px solid #e1dfdd; border-radius: 6px; overflow: hidden;
+  }
+  .monitor-topic-name-{{wpId}} {
+    padding: 8px 12px; background: #f3f2f1; font-size: 13px; font-weight: 600;
+    border-bottom: 1px solid #e1dfdd; display: flex; justify-content: space-between;
+  }
+  .monitor-topic-status-{{wpId}} {
+    font-size: 11px; padding: 2px 8px; border-radius: 10px;
+  }
+  .monitor-active-{{wpId}} { background: #dff6dd; color: #107c10; }
+  .monitor-empty-{{wpId}} { background: #f3f2f1; color: #a19f9d; }
+  .monitor-json-{{wpId}} {
+    padding: 10px 12px; background: #1e1e1e; color: #d4d4d4;
+    font-family: 'Consolas', monospace; font-size: 11px;
+    max-height: 120px; overflow: auto; white-space: pre-wrap; word-break: break-all;
+  }
+  .monitor-empty-msg-{{wpId}} {
+    padding: 10px 12px; color: #a19f9d; font-style: italic; font-size: 13px;
+  }
+</style>
+
+<div class="monitor-{{wpId}}">
+  <div class="monitor-header-{{wpId}}">
+    <h3 class="monitor-title-{{wpId}}">🔍 MessageBus Monitor</h3>
+  </div>
+
+  {{!-- selectedItem --}}
+  <div class="monitor-topic-{{wpId}}">
+    <div class="monitor-topic-name-{{wpId}}">
+      <span>selectedItem</span>
+      {{#if selectedItem.ID}}
+        <span class="monitor-topic-status-{{wpId}} monitor-active-{{wpId}}">● active</span>
+      {{else}}
+        <span class="monitor-topic-status-{{wpId}} monitor-empty-{{wpId}}">○ waiting</span>
+      {{/if}}
+    </div>
+    {{#if selectedItem.ID}}
+      <div class="monitor-json-{{wpId}}">{{json selectedItem}}</div>
+    {{else}}
+      <div class="monitor-empty-msg-{{wpId}}">No data received yet</div>
+    {{/if}}
+  </div>
+
+  {{!-- filterCategory --}}
+  <div class="monitor-topic-{{wpId}}">
+    <div class="monitor-topic-name-{{wpId}}">
+      <span>filterCategory</span>
+      {{#if filterCategory.ID}}
+        <span class="monitor-topic-status-{{wpId}} monitor-active-{{wpId}}">● active</span>
+      {{else}}
+        <span class="monitor-topic-status-{{wpId}} monitor-empty-{{wpId}}">○ waiting</span>
+      {{/if}}
+    </div>
+    {{#if filterCategory.ID}}
+      <div class="monitor-json-{{wpId}}">{{json filterCategory}}</div>
+    {{else}}
+      <div class="monitor-empty-msg-{{wpId}}">No data received yet</div>
+    {{/if}}
+  </div>
+
+  {{!-- itemUpdated --}}
+  <div class="monitor-topic-{{wpId}}">
+    <div class="monitor-topic-name-{{wpId}}">
+      <span>itemUpdated</span>
+      {{#if itemUpdated.Title}}
+        <span class="monitor-topic-status-{{wpId}} monitor-active-{{wpId}}">● active</span>
+      {{else}}
+        <span class="monitor-topic-status-{{wpId}} monitor-empty-{{wpId}}">○ waiting</span>
+      {{/if}}
+    </div>
+    {{#if itemUpdated.Title}}
+      <div class="monitor-json-{{wpId}}">{{json itemUpdated}}</div>
+    {{else}}
+      <div class="monitor-empty-msg-{{wpId}}">No data received yet</div>
+    {{/if}}
+  </div>
+
+  {{!-- editItem --}}
+  <div class="monitor-topic-{{wpId}}">
+    <div class="monitor-topic-name-{{wpId}}">
+      <span>editItem</span>
+      {{#if editItem.ID}}
+        <span class="monitor-topic-status-{{wpId}} monitor-active-{{wpId}}">● active</span>
+      {{else}}
+        <span class="monitor-topic-status-{{wpId}} monitor-empty-{{wpId}}">○ waiting</span>
+      {{/if}}
+    </div>
+    {{#if editItem.ID}}
+      <div class="monitor-json-{{wpId}}">{{json editItem}}</div>
+    {{else}}
+      <div class="monitor-empty-msg-{{wpId}}">No data received yet</div>
+    {{/if}}
+  </div>
+
+  {{!-- itemSaved --}}
+  <div class="monitor-topic-{{wpId}}">
+    <div class="monitor-topic-name-{{wpId}}">
+      <span>itemSaved</span>
+      {{#if itemSaved.Title}}
+        <span class="monitor-topic-status-{{wpId}} monitor-active-{{wpId}}">● active</span>
+      {{else}}
+        <span class="monitor-topic-status-{{wpId}} monitor-empty-{{wpId}}">○ waiting</span>
+      {{/if}}
+    </div>
+    {{#if itemSaved.Title}}
+      <div class="monitor-json-{{wpId}}">{{json itemSaved}}</div>
+    {{else}}
+      <div class="monitor-empty-msg-{{wpId}}">No data received yet</div>
+    {{/if}}
+  </div>
+</div>

@@ -1,0 +1,89 @@
+{{!-- 
+  TEST: MessageBus Filter Publisher + Filtered Table
+  ====================================================
+  Tests: data-hbwp-action="filter", CAML token resolution with {{division.*}},
+         multi-topic subscription, guard pattern (empty = skip query), clear action
+  
+  This is a SINGLE web part that acts as both filter source AND filtered table.
+  It uses the primary list as the "categories" and a data source for the filtered items.
+  
+  Setup (Option A — two web parts, recommended):
+  ─────────────────────────────────────────────────
+  WEB PART 1 (this template): Shows categories from a list.
+  - List: Any list with distinct categories (e.g. Departments, Categories)
+  - Property pane → Dynamic Data → Publish Topics:
+      Topic: "filterCategory"   Action: Filter   Enabled: ✓
+  
+  WEB PART 2 (test-bus-filtered-table.hbs): Shows items filtered by selected category.
+  - List: Items list with a lookup/text field matching the category
+  - Property pane → Dynamic Data → Subscribe Topics:
+      Topic: "filterCategory"   Context Key: "filter"   On Receive: Merge   Enabled: ✓
+  - CAML Filter: 
+      <Eq><FieldRef Name='Category'/><Value Type='Text'>{{filter.Title}}</Value></Eq>
+  
+  What to verify:
+  ✓ Clicking a category publishes action:'filter' with the item data
+  ✓ Subscriber resolves {{filter.Title}} in its CAML filter
+  ✓ Subscriber re-fetches with the resolved CAML and shows filtered rows
+  ✓ "Show All" button sends action:'clear', subscriber resets
+  ✓ Guard pattern: before any selection, subscriber shows placeholder
+--}}
+
+<style>
+  .filter-pub-{{wpId}} {
+    font-family: var(--body-font, 'Segoe UI', sans-serif);
+    padding: 16px;
+  }
+  .filter-pub-header-{{wpId}} {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #8764b8;
+  }
+  .filter-pub-title-{{wpId}} { font-size: 18px; font-weight: 600; color: #8764b8; margin: 0; }
+  .filter-pub-badge-{{wpId}} {
+    font-size: 11px; background: #8764b8; color: #fff; padding: 2px 8px;
+    border-radius: 12px; text-transform: uppercase;
+  }
+  .filter-pub-list-{{wpId}} { list-style: none; padding: 0; margin: 0; }
+  .filter-pub-item-{{wpId}} {
+    padding: 10px 16px; cursor: pointer; border-bottom: 1px solid #edebe9;
+    display: flex; justify-content: space-between; align-items: center;
+    transition: background 0.15s;
+  }
+  .filter-pub-item-{{wpId}}:hover { background: #f3f2f1; }
+  .filter-pub-item-{{wpId}} .title { font-size: 14px; font-weight: 600; }
+  .filter-pub-item-{{wpId}} .arrow { color: #a19f9d; }
+  .filter-pub-clear-{{wpId}} {
+    margin-top: 12px; padding: 8px 20px; border: 1px solid #8764b8; color: #8764b8;
+    background: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; width: 100%;
+  }
+  .filter-pub-clear-{{wpId}}:hover { background: #f9f5ff; }
+</style>
+
+<div class="filter-pub-{{wpId}}">
+  <div class="filter-pub-header-{{wpId}}">
+    <h3 class="filter-pub-title-{{wpId}}">Filter By Category</h3>
+    <span class="filter-pub-badge-{{wpId}}">PUB → filterCategory</span>
+  </div>
+
+  {{#if items.rows.length}}
+  <ul class="filter-pub-list-{{wpId}}">
+    {{#each items.rows}}
+    <li class="filter-pub-item-{{wpId}}"
+        data-hbwp-action="filter"
+        data-hbwp-topic="filterCategory"
+        data-hbwp-item='{{json this}}'>
+      <span class="title">{{Title}}</span>
+      <span class="arrow">→</span>
+    </li>
+    {{/each}}
+  </ul>
+
+  <button class="filter-pub-clear-{{wpId}}"
+          data-hbwp-action="clear"
+          data-hbwp-topic="filterCategory">
+    Show All (Clear Filter)
+  </button>
+  {{else}}
+  <p>No categories loaded. Point this web part at a list with categories.</p>
+  {{/if}}
+</div>

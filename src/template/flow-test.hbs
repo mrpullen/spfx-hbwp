@@ -58,7 +58,7 @@
   <h2>Trigger Flow</h2>
   <p class="subtitle">Select a user and submit to trigger the Power Automate flow.</p>
 
-  {{#hbwp-form endpoint="triggerFlow"}}
+  <hbwp-form data-endpoint="triggerFlow" data-wp-id="{{wpId}}">
 
     {{!-- userId dropdown from users data source --}}
     <div class="field-group">
@@ -72,7 +72,7 @@
     </div>
 
     {{!-- CurrentUserId hidden field from logged-in user --}}
-    {{hbwp-hidden name="CurrentUserId" value=user.Id type="number"}}
+    <hbwp-hidden name="CurrentUserId" value="{{user.Id}}" data-type="number"></hbwp-hidden>
 
     {{!-- Show who is submitting --}}
     <div class="field-group">
@@ -82,7 +82,7 @@
       </div>
     </div>
 
-    {{hbwp-submit label="Trigger Flow" appearance="accent"}}
+    <hbwp-submit label="Trigger Flow" appearance="accent"></hbwp-submit>
 
-  {{/hbwp-form}}
+  </hbwp-form>
 </div>

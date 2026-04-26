@@ -1,41 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import * as React from 'react';
-import type { IHandlebarsListViewProps, IListDataSource, IHttpEndpointDataSource } from './IHandlebarsListViewProps';
-import { FLOW_RESOURCE_URIS } from './IHandlebarsListViewProps';
-import Handlebars from "handlebars";
+import type { IHandlebarsListViewProps } from './IHandlebarsListViewProps';
 
-import helpers from 'handlebars-helpers'
-//import ReactHtmlParser from 'react-html-parser';
-import { ListDataService, IListDataResult, HttpDataService, FormSubmitService, SocialDataService, ITokenContext } from '../services';
-import { scopeCssClasses } from './scopeCssClasses';
+// ListDataService is no longer needed here — adapters emit already-normalized
+// data via the pipeline's data-changed envelopes.
+import { DataAdapterPipeline } from '../services';
+import { registerServiceContext, unregisterServiceContext, IServiceContext, IDataEnvelope as IMessageEnvelope, TemplateEngineBase, ITemplateEngineContext, getPageState, clearPageState, IPageState, IDataAdapterResult, IDataAdapterContext } from '@mrpullen/spfx-extensibility';
+import { HandlebarsTemplateEngine } from '../../../extensions/engines';
 
-/**
- * Resolves {{token}} expressions in a string using a context object.
- * Supports dot-notation and array indexing (e.g. {{user.email}}, {{page.Id}}).
- */
-function resolveTokens(template: string, context: ITokenContext): string {
-  if (!template) return template;
-  return template.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
-    try {
-      const parts = path.trim().replace(/\[(\d+)\]/g, '.$1').split('.');
-      let current: any = context;
-      for (const part of parts) {
-        if (current === undefined || current === null) return '';
-        current = current[part];
-      }
-      return current === undefined || current === null ? '' : String(current);
-    } catch {
-      return '';
-    }
-  });
-}
-
-interface IHandlebarsListViewState {
-  html: string;
-  visible: boolean;
-  pagingToken?: string;
-  pageHistory: string[];
-}
+interface IHandlebarsListViewState {}
 
 /**
  * Envelope wrapping list data rows with paging metadata.
@@ -63,475 +36,146 @@ interface ITemplateData {
   [key: string]: any;
 }
 
-helpers({ handlebars: Handlebars });
-
-// Override json helper with pretty-printed output
-Handlebars.registerHelper('json', function(context: unknown) {
-  return JSON.stringify(context, null, 2);
-});
-
-// Register custom form helpers
-/* eslint-disable dot-notation */
-Handlebars.registerHelper('hbwp-form', function(this: any, options: Handlebars.HelperOptions) {
-  const endpointKey = options.hash['endpoint'] || options.hash['submit'] || 'default';
-  const resetOnSuccess = options.hash['reset'] !== false;
-  const cssClass = options.hash['class'] || '';
-  const id = options.hash['id'] || '';
-  
-  const content = options.fn(this);
-  
-  return new Handlebars.SafeString(
-    `<form data-hbwp-submit="${endpointKey}" data-hbwp-reset="${resetOnSuccess}"${id ? ` id="${id}"` : ''}${cssClass ? ` class="${cssClass}"` : ''}>
-      ${content}
-      <div data-hbwp-result style="margin-top: 12px;"></div>
-    </form>`
-  );
-});
-
-Handlebars.registerHelper('hbwp-submit', function(options: Handlebars.HelperOptions) {
-  const label = options.hash['label'] || 'Submit';
-  const appearance = options.hash['appearance'] || 'accent';
-  const disabled = options.hash['disabled'] ? 'disabled' : '';
-  const cssClass = options.hash['class'] || '';
-  
-  return new Handlebars.SafeString(
-    `<fluent-button type="submit" appearance="${appearance}" ${disabled} class="${cssClass}">${label}</fluent-button>`
-  );
-});
-
-Handlebars.registerHelper('hbwp-input', function(options: Handlebars.HelperOptions) {
-  const name = options.hash['name'] || '';
-  const label = options.hash['label'] || '';
-  const type = options.hash['type'] || 'text';
-  const required = options.hash['required'] ? 'required' : '';
-  const pattern = options.hash['pattern'] ? `pattern="${options.hash['pattern']}"` : '';
-  const minlength = options.hash['minlength'] ? `minlength="${options.hash['minlength']}"` : '';
-  const maxlength = options.hash['maxlength'] ? `maxlength="${options.hash['maxlength']}"` : '';
-  const placeholder = options.hash['placeholder'] || '';
-  const value = options.hash['value'] || '';
-  
-  return new Handlebars.SafeString(
-    `<fluent-text-field name="${name}" type="${type}" ${required} ${pattern} ${minlength} ${maxlength} placeholder="${placeholder}" value="${value}" style="width: 100%;">${label}</fluent-text-field>`
-  );
-});
-
-Handlebars.registerHelper('hbwp-textarea', function(options: Handlebars.HelperOptions) {
-  const name = options.hash['name'] || '';
-  const label = options.hash['label'] || '';
-  const required = options.hash['required'] ? 'required' : '';
-  const rows = options.hash['rows'] || 3;
-  const placeholder = options.hash['placeholder'] || '';
-  
-  return new Handlebars.SafeString(
-    `<fluent-text-area name="${name}" ${required} rows="${rows}" placeholder="${placeholder}" style="width: 100%;">${label}</fluent-text-area>`
-  );
-});
-
-Handlebars.registerHelper('hbwp-select', function(this: any, options: Handlebars.HelperOptions) {
-  const name = options.hash['name'] || '';
-  const label = options.hash['label'] || '';
-  const required = options.hash['required'] ? 'required' : '';
-  
-  const content = options.fn(this);
-  
-  return new Handlebars.SafeString(
-    `<label style="display: block; margin-bottom: 4px; font-weight: 600;">${label}</label>
-    <fluent-select name="${name}" ${required} style="width: 100%;">
-      ${content}
-    </fluent-select>`
-  );
-});
-
-Handlebars.registerHelper('hbwp-checkbox', function(options: Handlebars.HelperOptions) {
-  const name = options.hash['name'] || '';
-  const label = options.hash['label'] || '';
-  const required = options.hash['required'] ? 'required' : '';
-  const checked = options.hash['checked'] ? 'checked' : '';
-  
-  return new Handlebars.SafeString(
-    `<fluent-checkbox name="${name}" ${required} ${checked}>${label}</fluent-checkbox>`
-  );
-});
-
-// Helper to generate JSON data attribute for hidden fields
-Handlebars.registerHelper('hbwp-hidden', function(options: Handlebars.HelperOptions) {
-  const name = options.hash['name'] || '';
-  const value = options.hash['value'] || '';
-  const dataType = options.hash['type'] || '';
-  const typeAttr = dataType ? ` data-type="${dataType}"` : '';
-  
-  return new Handlebars.SafeString(
-    `<input type="hidden" name="${name}" value="${value}"${typeAttr} />`
-  );
-});
-
-// SVG path constants for heart icons (Fluent UI HeartFill / Heart)
-const HEART_FILL_SVG = '<svg data-hbwp-heart-svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M7.99 3.31C6.57 1.07 2.54.73 1.09 3.52c-1.37 2.64.46 5.47 3.93 8.27.96.78 1.95 1.46 2.98 2.21 1.02-.75 2.01-1.43 2.97-2.2 3.47-2.8 5.3-5.64 3.93-8.28C13.45.73 9.42 1.07 7.99 3.31z"/></svg>';
-const HEART_OUTLINE_SVG = '<svg data-hbwp-heart-svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M7.99 3.31C6.57 1.07 2.54.73 1.09 3.52c-1.37 2.64.46 5.47 3.93 8.27.96.78 1.95 1.46 2.98 2.21 1.02-.75 2.01-1.43 2.97-2.2 3.47-2.8 5.3-5.64 3.93-8.28C13.45.73 9.42 1.07 7.99 3.31z" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>';
-
-// Custom helper: render a self-contained like/unlike toggle button matching OOTB SharePoint heart.
-// Usage: {{likeButton ID LikesCount LikedBy ../user.id}}
-// With color override: {{likeButton ID LikesCount LikedBy ../user.id color="#e3008c"}}
-Handlebars.registerHelper('likeButton', function(this: any, itemId: any, likesCount: any, likedByArray: any, userId: any, options: any) {
-  const count = parseInt(likesCount, 10) || 0;
-  let liked = false;
-  if (Array.isArray(likedByArray)) {
-    liked = likedByArray.some((item: any) => {
-      const propValue = item.Id !== undefined ? item.Id : item.id;
-      return String(propValue) === String(userId);
-    });
-  }
-  const activeColor = (options && options.hash && options.hash.color) || 'var(--ms-palette-neutralPrimary, #323130)';
-  const inactiveColor = 'var(--ms-semanticColors-infoIcon, #605e5c)';
-  const heartSvg = liked ? HEART_FILL_SVG : HEART_OUTLINE_SVG;
-  const heartColor = liked ? activeColor : inactiveColor;
-  const title = liked
-    ? 'You have liked this item, click to unlike it'
-    : 'Click to like this item';
-  const label = count === 1 ? 'Like' : 'Likes';
-  const escapedId = Handlebars.Utils.escapeExpression(String(itemId));
-  const escapedActiveColor = Handlebars.Utils.escapeExpression(activeColor);
-  return new Handlebars.SafeString(
-    `<div data-hbwp-like="${escapedId}" data-hbwp-liked="${liked}" data-hbwp-active-color="${escapedActiveColor}" ` +
-    `tabindex="0" role="button" title="${title}" ` +
-    `style="align-items:center;background:none;border-radius:2px;border:none;cursor:pointer;display:inline-flex;height:fit-content;min-height:28px;width:fit-content;padding:0;font-family:inherit">` +
-    `<div data-hbwp-heart style="align-items:center;background-color:transparent;color:${heartColor};display:flex;font-size:16px;height:28px;justify-content:center;width:28px;position:relative">` +
-    heartSvg +
-    `</div>` +
-    `<div data-hbwp-count style="font-size:12px;color:var(--ms-palette-neutralPrimary,#323130);white-space:nowrap">${count} ${label}</div>` +
-    `</div>`
-  );
-});
-
-// Custom helper: filter an array by property value (handles SharePoint lookup fields)
-Handlebars.registerHelper('filter', function(this: any, array: any[], property: string, value: any, options: any) {
-  if (!Array.isArray(array)) {
-    // Block usage: render else block if array is not valid
-    if (options && options.fn) {
-      return options.inverse(this);
-    }
-    return [];
-  }
-  const filtered = array.filter((item: any) => {
-    const propValue = item[property];
-    // Handle lookup fields (SharePoint returns {Id, Title} for lookups)
-    if (propValue && typeof propValue === 'object' && propValue.Id !== undefined) {
-      return String(propValue.Id) === String(value) || propValue.Title === value;
-    }
-    return String(propValue) === String(value);
-  });
-
-  // Block usage: {{#filter arr "prop" val}}...{{else}}...{{/filter}}
-  if (options && options.fn) {
-    if (filtered.length > 0) {
-      return options.fn(this);
-    }
-    return options.inverse(this);
-  }
-
-  // Inline usage: returns the filtered array
-  return filtered;
-});
-
-// Custom helper: calculate percentage (returns integer)
-Handlebars.registerHelper('percentage', function(count: number, total: number) {
-  if (!total || total === 0) return 0;
-  return Math.round((count / total) * 100);
-});
-
-// Custom helper: get substring of a string
-Handlebars.registerHelper('substring', function(str: string, start: number, end?: number) {
-  if (!str || typeof str !== 'string') return '';
-  if (end !== undefined) {
-    return str.substring(start, end);
-  }
-  return str.substring(start);
-});
-
-// Custom helper: concatenate strings (not in handlebars-helpers, they have 'join' for arrays)
-Handlebars.registerHelper('concat', function(...args: any[]) {
-  // Remove the last argument (Handlebars options object)
-  const strings = args.slice(0, -1);
-  return strings.join('');
-});
-
-// Custom helper: output data as formatted JSON for debugging
-Handlebars.registerHelper('json', function(context: any) {
-  return JSON.stringify(context, null, 2);
-});
-
-// Custom helper: render star rating as HTML (e.g. ★★★★☆)
-Handlebars.registerHelper('starRating', function(rating: any) {
-  const val = parseFloat(rating) || 0;
-  const full = Math.floor(val);
-  const half = (val - full) >= 0.5 ? 1 : 0;
-  const empty = 5 - full - half;
-  return new Handlebars.SafeString(
-    '<span style="color:#ffb900;">' + '\u2605'.repeat(full) +
-    (half ? '\u2BEA' : '') + '</span>' +
-    '<span style="color:#d2d0ce;">' + '\u2606'.repeat(empty) + '</span>'
-  );
-});
-
-// Custom helper: convert a value to an integer
-Handlebars.registerHelper('toInt', function(value: any) {
-  return parseInt(value, 10) || 0;
-});
-
-// Custom helper: modulo operation
-Handlebars.registerHelper('mod', function(a: any, b: any) {
-  return (parseInt(a, 10) || 0) % (parseInt(b, 10) || 1);
-});
-
-// Custom helper: shuffle an array (Fisher-Yates). Returns a new array.
-// Usage: {{#each (shuffle items.rows)}}...{{/each}}
-Handlebars.registerHelper('shuffle', function(arr: any) {
-  if (!Array.isArray(arr)) return arr;
-  const a = arr.slice(); // copy so we don't mutate the original
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const tmp = a[i]; a[i] = a[j]; a[j] = tmp;
-  }
-  return a;
-});
-
-/**
- * Paging helper: renders previous/next navigation controls.
- *
- * Usage:  {{hbwp-paging items.paging}}
- *         {{hbwp-paging items.paging label="Ideas"}}
- *
- * Renders styled prev/next buttons with data-hbwp-page attributes
- * that the component's click delegation picks up automatically.
- */
-Handlebars.registerHelper('hbwp-paging', function(paging: any, options: any) {
-  if (!paging) return '';
-
-  const hash = options && options.hash ? options.hash : {};
-  const label: string = hash.label || 'items';
-
-  const hasNext = !!paging.hasNext;
-  const hasPrev = !!paging.hasPrev;
-
-  // Don't render anything if there's only one page
-  if (!hasNext && !hasPrev) return '';
-
-  const pageNum = paging.pageNumber || 1;
-  const firstRow = paging.firstRow || '';
-  const lastRow = paging.lastRow || '';
-
-  // Range display: "1 – 30" or "31 – 60"
-  const rangeText = firstRow && lastRow
-    ? '<span class="hbwp-paging-range">' + Handlebars.Utils.escapeExpression(String(firstRow)) +
-      ' &ndash; ' + Handlebars.Utils.escapeExpression(String(lastRow)) +
-      ' ' + Handlebars.Utils.escapeExpression(label) + '</span>'
-    : '';
-
-  const prevBtn = '<button type="button" class="hbwp-paging-btn hbwp-paging-prev" data-hbwp-page="prev"'
-    + (hasPrev ? '' : ' disabled')
-    + ' aria-label="Previous page"'
-    + ' title="Previous page">'
-    + '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">'
-    + '<path d="M10.354 3.354L5.707 8l4.647 4.646-.708.708L4.293 8l5.353-5.354.708.708z"/>'
-    + '</svg>'
-    + '</button>';
-
-  const nextBtn = '<button type="button" class="hbwp-paging-btn hbwp-paging-next" data-hbwp-page="next"'
-    + (hasNext ? '' : ' disabled')
-    + ' aria-label="Next page"'
-    + ' title="Next page">'
-    + '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">'
-    + '<path d="M5.646 12.646L10.293 8 5.646 3.354l.708-.708L11.707 8l-5.353 5.354-.708-.708z"/>'
-    + '</svg>'
-    + '</button>';
-
-  const pageIndicator = '<span class="hbwp-paging-page">Page ' + Handlebars.Utils.escapeExpression(String(pageNum)) + '</span>';
-
-  const html = '<nav class="hbwp-paging" role="navigation" aria-label="Pagination">'
-    + '<div class="hbwp-paging-controls">'
-    + prevBtn
-    + pageIndicator
-    + nextBtn
-    + '</div>'
-    + (rangeText ? '<div class="hbwp-paging-info">' + rangeText + '</div>' : '')
-    + '</nav>';
-
-  return new Handlebars.SafeString(html);
-});
-
-/* eslint-enable dot-notation */
-
 export default class HandlebarsListView extends React.Component<IHandlebarsListViewProps, IHandlebarsListViewState> {
-  
-  private listDataService: ListDataService | undefined;
-  private httpDataService: HttpDataService | undefined;
-  private formSubmitService: FormSubmitService | undefined;
-  private socialDataService: SocialDataService | undefined;
+
+  // Pipeline for main data loading and write operations (form submit, social)
+  private _pipeline: DataAdapterPipeline | undefined;
+  private _adapterResults: Record<string, IDataAdapterResult> = {};
+
   private containerRef: React.RefObject<HTMLDivElement>;
-  private lastPagingNextHref: string | undefined;
+  /** Unsubscribe callbacks for MessageBus subscriptions (per adapter topic) */
+  private _busUnsubs: (() => void)[] = [];
+  /** Debounce timer for collapsing burst result updates into a single render */
+  private _renderTimer: number | undefined;
+  /** The active template engine instance */
+  private _templateEngine: TemplateEngineBase | undefined;
+  /** Reactive state store scoped to this web part instance */
+  private _pageState: IPageState | undefined;
 
   constructor(props: IHandlebarsListViewProps) {
     super(props);
-    this.state = {
-      html: '',
-      visible: false,
-      pagingToken: undefined,
-      pageHistory: []
-    };
-    
+    this.state = {};
+
     this.containerRef = React.createRef();
-    
-    // Initialize list data service if sp is available
-    if (props.sp) {
-      this.listDataService = new ListDataService(props.sp, {
-        enabled: props.cacheOptions?.enabled ?? true,
-        timeoutMinutes: props.cacheOptions?.timeoutMinutes ?? 15
-      });
-    }
-    
-    // Resolve flow resource URI based on cloud environment
-    const flowResourceUri = FLOW_RESOURCE_URIS[props.cloudEnvironment || 'commercial'];
-    
-    // Initialize HTTP data service if both clients are available
-    if (props.aadHttpClientFactory && props.httpClient) {
-      this.httpDataService = new HttpDataService(
-        props.aadHttpClientFactory, 
-        props.httpClient,
-        {
-          enabled: props.cacheOptions?.enabled ?? true,
-          timeoutMinutes: props.cacheOptions?.timeoutMinutes ?? 15
-        },
-        flowResourceUri
-      );
-    }
-    
-    // Initialize form submit service if all clients are available
-    if (props.sp && props.aadHttpClientFactory && props.httpClient) {
-      this.formSubmitService = new FormSubmitService(
-        props.sp,
-        props.aadHttpClientFactory,
-        props.httpClient,
-        flowResourceUri
-      );
-      // Register submit endpoints if provided
-      if (props.submitEndpoints) {
-        this.formSubmitService.registerEndpoints(props.submitEndpoints);
-      }
-    }
-    
-    // Initialize social data service
-    if (props.sp) {
-      this.socialDataService = new SocialDataService(props.sp);
-    }
 
     // Bind event handlers
-    this.handleFormSubmit = this.handleFormSubmit.bind(this);
-    this.handleSocialAction = this.handleSocialAction.bind(this);
     this.handleContainerClick = this.handleContainerClick.bind(this);
-    this.handleContainerSubmit = this.handleContainerSubmit.bind(this);
-    this.handlePaging = this.handlePaging.bind(this);
   }
 
+  /**
+   * executeWrite delegate exposed on the ServiceContext so web components
+   * (HbwpFormElement, HbwpLikeElement, HbwpRateElement) can invoke pipeline
+   * write adapters without importing pipeline internals.
+   */
+  private executeWrite = async (
+    key: string,
+    operation: string,
+    payload: any
+  ): Promise<{ success: boolean; data?: any; error?: string }> => {
+    if (!this._pipeline) return { success: false, error: 'Pipeline not initialized' };
+    return this._pipeline.executeWrite(key, operation, payload, this.buildBaseContext());
+  };
 
   public async componentDidMount(): Promise<void> {
-    await this.getHandlebarsTemplate();
-    
+    // Create a PageState instance scoped to this web part
+    this._pageState = getPageState(this.props.instanceId);
+
+    // Initialize the pipeline first so executeWrite is wired before web
+    // components render and call into the ServiceContext.
+    this.initPipeline();
+
+    // Publish service context so extensibility web components can reach
+    // pipeline write adapters and shared metadata.
+    const ctx: IServiceContext = {
+      instanceId: this.props.instanceId,
+      siteUrl: this.props.site?.url,
+      listId: this.props.list,
+      executeWrite: this.executeWrite,
+      userProfile: this.props.userProfile,
+      pageData: this.props.pageData,
+      cloudEnvironment: this.props.cloudEnvironment,
+      messageBus: this.props.messageBus,
+      pageState: this._pageState
+    };
+    registerServiceContext(ctx);
+
+    // Subscribe to each adapter's data-changed envelope; attach pipeline to bus.
+    this.subscribeToAdapterResults();
+    if (this._pipeline && this.props.messageBus) {
+      await this._pipeline.attach(this.props.messageBus, () => this.buildBaseContext());
+    } else {
+      // No message bus → render whatever scaffold exists
+      await this.renderTemplate();
+    }
+
     // Attach delegated event listeners directly on the container.
-    // Injected <script> tags don't execute via ReactHtmlParser, so all
-    // click / submit delegation must live here in the React component.
     if (this.containerRef.current) {
       this.containerRef.current.addEventListener('click', this.handleContainerClick);
-      this.containerRef.current.addEventListener('submit', this.handleContainerSubmit);
-      this.containerRef.current.addEventListener('hbwp-form-submit', this.handleFormSubmit as unknown as EventListener);
     }
   }
-  
+
   public componentWillUnmount(): void {
+    // Unsubscribe from MessageBus
+    this._busUnsubs.forEach(fn => fn());
+    this._busUnsubs = [];
+    clearTimeout(this._renderTimer);
+
+    // Destroy the template engine if it was active
+    if (this._templateEngine && this.containerRef.current) {
+      this._templateEngine.destroy(this.containerRef.current);
+      this._templateEngine = undefined;
+    }
+
+    // Detach + dispose the data adapter pipeline
+    this._pipeline?.dispose();
+    this._pipeline = undefined;
+
+    // Clean up PageState for this web part instance
+    clearPageState(this.props.instanceId);
+    this._pageState = undefined;
+
+    unregisterServiceContext(this.props.instanceId);
     if (this.containerRef.current) {
       this.containerRef.current.removeEventListener('click', this.handleContainerClick);
-      this.containerRef.current.removeEventListener('submit', this.handleContainerSubmit);
-      this.containerRef.current.removeEventListener('hbwp-form-submit', this.handleFormSubmit as unknown as EventListener);
-    }
-  }
-
-  /**
-   * Handles form submission events from the template
-   */
-  private async handleFormSubmit(event: CustomEvent): Promise<void> {
-    const { endpointKey, formData, form, submitButton, originalButtonText } = event.detail;
-    
-    if (!this.formSubmitService) {
-      console.error('FormSubmitService not initialized');
-      this.showFormResult(form, submitButton, originalButtonText, false, 'Form service not available');
-      return;
-    }
-    
-    try {
-      const result = await this.formSubmitService.submit(endpointKey, formData);
-      this.showFormResult(form, submitButton, originalButtonText, result.success, result.error, result.data);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.showFormResult(form, submitButton, originalButtonText, false, errorMessage);
-    }
-  }
-  
-  /**
-   * Displays success/failure result inline in the form and re-enables the submit button.
-   */
-  private showFormResult(
-    form: HTMLFormElement,
-    submitButton: HTMLElement | null,
-    originalButtonText: string,
-    success: boolean,
-    error?: string,
-    _data?: any
-  ): void {
-    // Re-enable submit button
-    if (submitButton) {
-      (submitButton as HTMLButtonElement).disabled = false;
-      submitButton.textContent = originalButtonText;
-    }
-
-    // Write message into the result container already rendered by {{#hbwp-form}}
-    const resultContainer = form.querySelector('[data-hbwp-result]') as HTMLElement | null;
-    if (resultContainer) {
-      if (success) {
-        resultContainer.innerHTML =
-          '<div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:4px;background:#dff6dd;color:#0e700e;font-size:14px;">' +
-          '<span style="font-size:16px;">&#10003;</span> Submitted successfully!' +
-          '</div>';
-        // Optionally reset form fields
-        if (form.dataset.hbwpReset !== 'false') {
-          // Reset native inputs
-          form.reset();
-          // Also reset Fluent UI web-component values that .reset() doesn't cover
-          form.querySelectorAll('fluent-text-field, fluent-text-area, fluent-select').forEach((el: any) => {
-            if (typeof el.value !== 'undefined') el.value = '';
-          });
-        }
-      } else {
-        resultContainer.innerHTML =
-          '<div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:4px;background:#fde7e9;color:#a80000;font-size:14px;">' +
-          '<span style="font-size:16px;">&#10007;</span> ' +
-          (error ? error.replace(/</g, '&lt;').replace(/>/g, '&gt;') : 'Submission failed') +
-          '</div>';
-      }
-      // Auto-clear the message after 8 seconds
-      setTimeout(() => { if (resultContainer) resultContainer.innerHTML = ''; }, 8000);
     }
   }
 
   /**
    * Delegated click handler for template interactions:
+   * - MessageBus publish: data-hbwp-action + data-hbwp-topic (inline path)
    * - Panel open/close: data-hbwp-panel-open="id" / data-hbwp-panel-close="id"
-   * - Social actions: data-hbwp-like, data-hbwp-rate
+   *
+   * Social actions and paging are handled by the dedicated <hbwp-like>,
+   * <hbwp-rate> and <hbwp-pager> web components.
    */
   private handleContainerClick(e: Event): void {
     const target = e.target as HTMLElement;
 
+    // ── MessageBus topic publish (data-hbwp-action + data-hbwp-topic) ──
+    const actionEl = target.closest<HTMLElement>('[data-hbwp-action]');
+    if (actionEl) {
+      const action = actionEl.getAttribute('data-hbwp-action');
+      const topic = actionEl.getAttribute('data-hbwp-topic');
+      if (action && topic && this.props.messageBus) {
+        let item: Record<string, any> | undefined;
+        let items: Record<string, any>[] | undefined;
+        const itemJson = actionEl.getAttribute('data-hbwp-item');
+        const itemsJson = actionEl.getAttribute('data-hbwp-items');
+        try { if (itemJson) item = JSON.parse(itemJson); } catch (_e) { /* ignore bad JSON */ }
+        try { if (itemsJson) items = JSON.parse(itemsJson); } catch (_e) { /* ignore bad JSON */ }
+
+        const envelope: IMessageEnvelope = {
+          topic,
+          source: this.props.instanceId,
+          timestamp: Date.now(),
+          action: action as IMessageEnvelope['action'],
+          data: { ...(item !== undefined ? { item } : {}), ...(items !== undefined ? { items } : {}) }
+        };
+        this.props.messageBus.publish(envelope);
+      }
+    }
+
     // ── Panel open / close ──
-    // Uses data-hbwp-open attribute (not CSS class) to avoid scopeCssClasses renaming
-    // Works with both data-attribute toggle (div) and fluent-drawer (.show()/.hide())
     const panelOpen = target.closest<HTMLElement>('[data-hbwp-panel-open]');
     if (panelOpen) {
       const panelId = panelOpen.getAttribute('data-hbwp-panel-open');
@@ -563,491 +207,294 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       }
       return;
     }
-
-    // ── Social actions ──
-    const likeBtn = target.closest<HTMLElement>('[data-hbwp-like]');
-    const rateBtn = target.closest<HTMLElement>('[data-hbwp-rate]');
-
-    if (likeBtn) {
-      e.preventDefault();
-      e.stopPropagation();
-      const itemId = likeBtn.getAttribute('data-hbwp-like');
-      const liked = likeBtn.getAttribute('data-hbwp-liked') === 'true';
-
-      // Optimistic UI — swap SVG heart and toggle colors to match OOTB SharePoint
-      const heartWrap = likeBtn.querySelector('[data-hbwp-heart]') as HTMLElement;
-      const countEl = likeBtn.querySelector('[data-hbwp-count]');
-      const activeColor = likeBtn.getAttribute('data-hbwp-active-color') || 'var(--ms-palette-neutralPrimary, #323130)';
-      const inactiveColor = 'var(--ms-semanticColors-infoIcon, #605e5c)';
-      if (heartWrap) {
-        if (liked) {
-          heartWrap.innerHTML = HEART_OUTLINE_SVG;
-          heartWrap.style.color = inactiveColor;
-        } else {
-          heartWrap.innerHTML = HEART_FILL_SVG;
-          heartWrap.style.color = activeColor;
-        }
-      }
-      if (countEl) {
-        const current = parseInt(countEl.textContent || '0', 10) || 0;
-        const newCount = liked ? Math.max(0, current - 1) : current + 1;
-        countEl.textContent = newCount + (newCount === 1 ? ' Like' : ' Likes');
-      }
-      likeBtn.setAttribute('data-hbwp-liked', liked ? 'false' : 'true');
-      likeBtn.setAttribute('title', liked ? 'Click to like this item' : 'You have liked this item, click to unlike it');
-
-      // Fire API call
-      this.handleSocialAction({ action: 'like', itemId: itemId || '', currentlyLiked: liked });
-    }
-
-    if (rateBtn) {
-      e.preventDefault();
-      e.stopPropagation();
-      const rateItemId = rateBtn.getAttribute('data-hbwp-rate');
-      const rateValue = rateBtn.getAttribute('data-hbwp-rate-value');
-      this.handleSocialAction({ action: 'rate', itemId: rateItemId || '', value: rateValue });
-    }
-
-    // Paging: data-hbwp-page="next" or data-hbwp-page="prev"
-    const pageBtn = target.closest<HTMLElement>('[data-hbwp-page]');
-    if (pageBtn) {
-      e.preventDefault();
-      e.stopPropagation();
-      const direction = pageBtn.getAttribute('data-hbwp-page');
-      if (direction === 'next' || direction === 'prev') {
-        this.handlePaging(direction).catch(() => { /* handled internally */ });
-      }
-    }
-  }
-
-  /**
-   * Delegated submit handler for forms with data-hbwp-submit.
-   */
-  private handleContainerSubmit(e: Event): void {
-    const form = (e.target as HTMLElement).closest<HTMLFormElement>('form[data-hbwp-submit]');
-    if (!form) return;
-
-    e.preventDefault();
-
-    if (!form.checkValidity()) {
-      form.reportValidity();
-      return;
-    }
-
-    const endpointKey = form.dataset.hbwpSubmit;
-    const submitBtn = form.querySelector<HTMLButtonElement>('[type="submit"]');
-    const originalBtnText = submitBtn ? submitBtn.textContent || '' : '';
-
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Submitting...';
-    }
-
-    const formData: Record<string, any> = {};
-    const formElements = form.elements;
-    for (let i = 0; i < formElements.length; i++) {
-      const el = formElements[i] as any;
-      if (el.name && !el.disabled) {
-        if (el.type === 'checkbox') {
-          formData[el.name] = el.checked;
-        } else if (el.type === 'radio') {
-          if (el.checked) formData[el.name] = el.value;
-        } else if (el.tagName === 'SELECT' && el.multiple) {
-          formData[el.name] = Array.from(el.selectedOptions as ArrayLike<HTMLOptionElement>).map((o: HTMLOptionElement) => o.value);
-        } else {
-          formData[el.name] = el.value;
-        }
-      }
-    }
-
-    // Coerce values based on data-type attributes
-    // Supports: data-type="number", data-type="boolean", data-type="string" (default)
-    // Works on <input>, <fluent-select>, <fluent-text-field>, and any named element
-    for (let i = 0; i < formElements.length; i++) {
-      const el = formElements[i] as HTMLElement & { name?: string };
-      if (!el.name || !(el.name in formData)) continue;
-      const dataType = el.getAttribute('data-type');
-      if (!dataType) continue;
-      const raw = formData[el.name];
-      if (dataType === 'number') {
-        const num = Number(raw);
-        formData[el.name] = isNaN(num) ? raw : num;
-      } else if (dataType === 'boolean') {
-        formData[el.name] = raw === 'true' || raw === '1' || raw === true;
-      }
-    }
-
-    // Dispatch CustomEvent so existing handleFormSubmit picks it up
-    this.containerRef.current?.dispatchEvent(new CustomEvent('hbwp-form-submit', {
-      bubbles: true,
-      detail: {
-        endpointKey,
-        formData,
-        wpId: this.props.instanceId,
-        form,
-        submitButton: submitBtn,
-        originalButtonText: originalBtnText
-      }
-    }));
-  }
-
-  /**
-   * Processes a social action (like/unlike or rate).
-   */
-  private handleSocialAction(detail: { action: string; itemId: string; currentlyLiked?: boolean; value?: any }): void {
-    const { action, itemId, currentlyLiked, value } = detail;
-    const siteUrl = this.props.site?.url;
-    const listId = this.props.list;
-
-    if (!this.socialDataService || !siteUrl || !listId) return;
-
-    if (action === 'like') {
-      // Fire-and-forget: optimistic UI already applied.
-      this.socialDataService.toggleLike(siteUrl, listId, Number(itemId), !!currentlyLiked)
-        .then(() => {
-          if (this.listDataService) {
-            this.listDataService.clearListCache(siteUrl, listId, this.props.view || '');
-          }
-        })
-        .catch((error: any) => console.error('Like toggle failed:', error));
-    } else if (action === 'rate') {
-      this.socialDataService.rate(siteUrl, listId, Number(itemId), Number(value))
-        .then(() => {
-          if (this.listDataService) {
-            this.listDataService.clearListCache(siteUrl, listId, this.props.view || '');
-          }
-          return this.getHandlebarsTemplate();
-        })
-        .catch((error: any) => console.error('Rating failed:', error));
-    }
-  }
-
-  /**
-   * Handles paging navigation (next/prev).
-   * Stores current token in history for back navigation, then re-fetches.
-   */
-  private async handlePaging(direction: 'next' | 'prev'): Promise<void> {
-    const nextHref = this.lastPagingNextHref;
-
-    if (direction === 'next' && nextHref) {
-      this.setState(
-        (prev) => ({
-          pageHistory: [...prev.pageHistory, prev.pagingToken || ''],
-          pagingToken: nextHref
-        }),
-        () => this.getHandlebarsTemplate()
-      );
-    } else if (direction === 'prev') {
-      if (this.state.pageHistory.length > 0) {
-        this.setState(
-          (prev) => {
-            const history = [...prev.pageHistory];
-            const prevToken = history.pop();
-            return {
-              pageHistory: history,
-              pagingToken: prevToken || undefined
-            };
-          },
-          () => this.getHandlebarsTemplate()
-        );
-      }
-    }
   }
 
   public async componentDidUpdate(prevProps: IHandlebarsListViewProps): Promise<void> {
-    // Re-render if relevant props changed
-    if (
-      prevProps.template !== this.props.template ||
+    const configsChanged =
       prevProps.list !== this.props.list ||
       prevProps.view !== this.props.view ||
       prevProps.site?.url !== this.props.site?.url ||
       JSON.stringify(prevProps.dataSources) !== JSON.stringify(this.props.dataSources) ||
       JSON.stringify(prevProps.httpEndpoints) !== JSON.stringify(this.props.httpEndpoints) ||
-      JSON.stringify(prevProps.submitEndpoints) !== JSON.stringify(this.props.submitEndpoints)
-    ) {
-      // Reset paging when data source changes
-      if (
-        prevProps.list !== this.props.list ||
-        prevProps.view !== this.props.view ||
-        prevProps.site?.url !== this.props.site?.url
-      ) {
-        this.lastPagingNextHref = undefined;
-        this.setState({ pagingToken: undefined, pageHistory: [] });
+      JSON.stringify(prevProps.submitEndpoints) !== JSON.stringify(this.props.submitEndpoints) ||
+      JSON.stringify(prevProps.adapterConfigs) !== JSON.stringify(this.props.adapterConfigs) ||
+      JSON.stringify(prevProps.incomingItem) !== JSON.stringify(this.props.incomingItem) ||
+      JSON.stringify(prevProps.incomingItems) !== JSON.stringify(this.props.incomingItems) ||
+      prevProps.cloudEnvironment !== this.props.cloudEnvironment ||
+      JSON.stringify(prevProps.cacheOptions) !== JSON.stringify(this.props.cacheOptions);
+
+    if (configsChanged) {
+      // Tear down existing pipeline + bus subscriptions and rebuild from scratch
+      this._busUnsubs.forEach(fn => fn());
+      this._busUnsubs = [];
+      this._pipeline?.dispose();
+      this._pipeline = undefined;
+      this._adapterResults = {};
+
+      this.initPipeline();
+
+      // Update ServiceContext with the refreshed pipeline-backed executeWrite
+      const ctx: IServiceContext = {
+        instanceId: this.props.instanceId,
+        siteUrl: this.props.site?.url,
+        listId: this.props.list,
+        executeWrite: this.executeWrite,
+        userProfile: this.props.userProfile,
+        pageData: this.props.pageData,
+        cloudEnvironment: this.props.cloudEnvironment,
+        messageBus: this.props.messageBus,
+        pageState: this._pageState
+      };
+      registerServiceContext(ctx);
+
+      this.subscribeToAdapterResults();
+      const pipeline = this._pipeline as DataAdapterPipeline | undefined;
+      if (pipeline && this.props.messageBus) {
+        await pipeline.attach(this.props.messageBus, () => this.buildBaseContext());
+      } else {
+        await this.renderTemplate();
       }
-      await this.getHandlebarsTemplate();
+    } else if (prevProps.template !== this.props.template) {
+      // Template only — re-render with existing data
+      await this.renderTemplate();
     }
-    
-    // Update submit endpoints if they changed
-    if (this.formSubmitService && this.props.submitEndpoints) {
-      if (JSON.stringify(prevProps.submitEndpoints) !== JSON.stringify(this.props.submitEndpoints)) {
-        this.formSubmitService.registerEndpoints(this.props.submitEndpoints);
-      }
-    }
-    
-    // Reinitialize services if cloud environment changed (flow resource URI changes)
-    if (prevProps.cloudEnvironment !== this.props.cloudEnvironment) {
-      const flowResourceUri = FLOW_RESOURCE_URIS[this.props.cloudEnvironment || 'commercial'];
-      if (this.props.aadHttpClientFactory && this.props.httpClient) {
-        this.httpDataService = new HttpDataService(
-          this.props.aadHttpClientFactory,
-          this.props.httpClient,
-          {
-            enabled: this.props.cacheOptions?.enabled ?? true,
-            timeoutMinutes: this.props.cacheOptions?.timeoutMinutes ?? 15
-          },
-          flowResourceUri
-        );
-      }
-      if (this.props.sp && this.props.aadHttpClientFactory && this.props.httpClient) {
-        this.formSubmitService = new FormSubmitService(
-          this.props.sp,
-          this.props.aadHttpClientFactory,
-          this.props.httpClient,
-          flowResourceUri
-        );
-        if (this.props.submitEndpoints) {
-          this.formSubmitService.registerEndpoints(this.props.submitEndpoints);
+  }
+
+  // ── Adapter result subscriptions ──────────────────────────────────────
+
+  /**
+   * Subscribe to the `data-changed` envelope on every read adapter's topic.
+   * Each result lands in `_adapterResults` and triggers a debounced re-render.
+   */
+  private subscribeToAdapterResults(): void {
+    if (!this._pipeline || !this.props.messageBus) return;
+    const configs = this.props.adapterConfigs || [];
+    for (const cfg of configs) {
+      if (cfg.key.startsWith('_')) continue; // skip write-only adapters
+      const unsub = this.props.messageBus.subscribe(cfg.key, (envelope: IMessageEnvelope) => {
+        if (envelope.action !== 'data-changed') return;
+        const result = envelope.data?.result;
+        if (result) {
+          this._adapterResults[cfg.key] = result as IDataAdapterResult;
+          this.scheduleRender();
         }
-      }
+      });
+      this._busUnsubs.push(unsub);
     }
-    
-    // Update cache settings if they changed
-    if (this.listDataService) {
-      if (prevProps.cacheOptions?.enabled !== this.props.cacheOptions?.enabled) {
-        this.listDataService.setCacheEnabled(this.props.cacheOptions?.enabled ?? true);
-      }
-      if (prevProps.cacheOptions?.timeoutMinutes !== this.props.cacheOptions?.timeoutMinutes) {
-        this.listDataService.setCacheTimeout(this.props.cacheOptions?.timeoutMinutes ?? 15);
-      }
-    }
-    
-    if (this.httpDataService) {
-      if (prevProps.cacheOptions?.enabled !== this.props.cacheOptions?.enabled) {
-        this.httpDataService.setCacheEnabled(this.props.cacheOptions?.enabled ?? true);
-      }
-      if (prevProps.cacheOptions?.timeoutMinutes !== this.props.cacheOptions?.timeoutMinutes) {
-        this.httpDataService.setCacheTimeout(this.props.cacheOptions?.timeoutMinutes ?? 15);
-      }
-    }
-  }
-  
-  private async getHandlebarsTemplate(): Promise<void> {
-    const templateData = await this.getAllData();
-
-    // Scope CSS classes in <style> blocks with the web part instance ID
-    const wpId = this.props.instanceId;
-    const scopedTemplate = scopeCssClasses(this.props.template, wpId);
-
-    const template = Handlebars.compile(scopedTemplate);
-    const templateContent = template(templateData);
-    
-    this.setState({
-      html: templateContent,
-      visible: true
-    });
   }
 
   /**
-   * Builds an IDataEnvelope from an IListDataResult.
+   * Debounced render — collapses bursts of data-changed envelopes into a
+   * single template render.
    */
-  private static toEnvelope(result: IListDataResult): IDataEnvelope {
-    return {
-      rows: result.items,
-      paging: {
-        hasNext: !!result.nextHref,
-        hasPrev: !!result.prevHref,
-        nextHref: result.nextHref,
-        prevHref: result.prevHref,
-        firstRow: result.firstRow,
-        lastRow: result.lastRow,
-        rowLimit: result.rowLimit
-      }
-    };
+  private scheduleRender = (): void => {
+    clearTimeout(this._renderTimer);
+    this._renderTimer = window.setTimeout(() => this.renderTemplate(), 50);
+  };
+
+  // ── Data adapter pipeline ─────────────────────────────────────────────
+
+  /**
+   * Initializes the DataAdapterPipeline:
+   *   1. Builds the platform-services DI bag (or reuses one passed via props)
+   *   2. Registers all adapter type definitions from the extensibility service
+   *   3. Instantiates configured adapter instances from props.adapterConfigs
+   */
+  private initPipeline(): void {
+    const services = this.props.platformServices;
+    if (!services) {
+      console.warn('[HandlebarsListView] No platformServices on props — pipeline disabled');
+      return;
+    }
+
+    this._pipeline = new DataAdapterPipeline(services);
+
+    // Register adapter type definitions from the extensibility service
+    if (this.props.extensibilityService) {
+      const defs = this.props.extensibilityService.getDataAdapterDefinitions();
+      this._pipeline.registerDefinitions(defs);
+    }
+
+    // Instantiate configured adapter instances
+    if (this.props.adapterConfigs && this.props.adapterConfigs.length > 0) {
+      this._pipeline.instantiate(this.props.adapterConfigs);
+    }
+
+    // Seed scaffold so first render has empty defaults for every read adapter
+    this._adapterResults = this._pipeline.buildScaffold();
   }
 
   /**
-   * Loads all data including primary list, additional data sources, HTTP endpoints, and user profile
+   * Builds the base context fields shared across every adapter execution.
+   * Includes resolvedData seeds for SPFx Dynamic Data tokens (incoming /
+   * incomingItems) so adapters can resolve those in CAML / URL templates.
    */
-  private async getAllData(): Promise<ITemplateData> {
-    // Parse URL query string parameters for use in CAML filters and templates
+  private buildBaseContext(): Omit<IDataAdapterContext, 'config'> {
     const query: Record<string, string> = {};
     const params = new URLSearchParams(window.location.search);
     params.forEach((value, key) => { query[key] = value; });
 
-    // Build token context from user and page data (available before list fetches)
-    const filterTokenContext: ITokenContext = {
-      user: this.props.userProfile || {},
-      page: this.props.pageData || {},
-      query
-    };
+    const resolvedData: Record<string, any> = {};
+    if (this.props.incomingItem) resolvedData.incoming = this.props.incomingItem;
+    if (this.props.incomingItems) resolvedData.incomingItems = this.props.incomingItems;
 
-    // Get primary list data (with resolved CAML filter)
-    const primaryResult = await this.getPrimaryListData(filterTokenContext);
-    const primaryEnvelope = HandlebarsListView.toEnvelope(primaryResult);
-
-    // Store paging href for the paging click handler
-    this.lastPagingNextHref = primaryResult.nextHref;
-
-    // Override hasPrev based on component's page history (more reliable than SP's prevHref)
-    primaryEnvelope.paging.hasPrev = this.state.pageHistory.length > 0;
-    primaryEnvelope.paging.pageNumber = this.state.pageHistory.length + 1;
-
-    // Get additional data sources (with resolved CAML filters)
-    const dataSources = await this.getAdditionalDataSources(filterTokenContext);
-
-    // Build full token context for HTTP endpoints (includes list data rows)
-    const dsRows: Record<string, any> = {};
-    for (const key of Object.keys(dataSources)) {
-      dsRows[key] = dataSources[key].rows;
-    }
-    const tokenContext: ITokenContext = {
-      items: primaryEnvelope.rows,
+    return {
+      instanceId: this.props.instanceId,
       user: this.props.userProfile || {},
       page: this.props.pageData || {},
       query,
-      ...dsRows
+      resolvedData
+    };
+  }
+
+  /**
+   * Renders the configured template engine into the host container.
+   *
+   * Engine resolution flows through `extensibilityService.createTemplateEngine(engineId)`,
+   * so any registered engine (handlebars by default, plus any libraries that
+   * contribute their own) handles compile + DOM lifecycle. The web part itself
+   * is engine-agnostic — it only assembles the data and hands it to the engine.
+   */
+  private async renderTemplate(): Promise<void> {
+    if (!this.containerRef.current) return;
+
+    const templateData = this.getAllData();
+    const wpId = this.props.instanceId;
+    const engineId = this.props.templateEngine || 'handlebars';
+
+    // Resolve or create the template engine via the extensibility service
+    if (!this._templateEngine || this._templateEngine.engineId !== engineId) {
+      if (this._templateEngine) {
+        this._templateEngine.destroy(this.containerRef.current);
+        this._templateEngine = undefined;
+      }
+      if (this.props.extensibilityService) {
+        this._templateEngine = this.props.extensibilityService.createTemplateEngine(engineId);
+
+        // Handlebars engine needs a back-reference to the extensibility service
+        // so it can register custom helpers/partials at compile time.
+        if (this._templateEngine instanceof HandlebarsTemplateEngine) {
+          this._templateEngine.setExtensibilityService(this.props.extensibilityService);
+        }
+      }
+    }
+
+    if (!this._templateEngine) {
+      console.error(`[HandlebarsListView] No template engine resolved for engineId="${engineId}"`);
+      return;
+    }
+
+    const context: ITemplateEngineContext = {
+      instanceId: wpId,
+      template: this.props.template,
+      engineProperties: {},
+      pageState: this._pageState || getPageState(wpId)
     };
 
-    // Get HTTP endpoint data (can use tokens from list data, user, and page)
-    const httpData = await this.getHttpEndpointData(tokenContext);
+    this._templateEngine.render(context, templateData, this.containerRef.current);
+  }
 
-    // Build template data object with data sources spread at root level
-    // Each list data source is an envelope: { rows: [...], paging: {...} }
+  /**
+   * Synchronously assembles a placeholder ITemplateData from the latest
+   * `_adapterResults` snapshot.
+   *
+   * This method does NOT fetch — every adapter populates its own slot
+   * asynchronously (the pipeline calls `fetch()` on attach + on every
+   * `refresh-requested` envelope, then publishes a `data-changed` envelope
+   * that the bus subscription in `subscribeToAdapterResults` lands here).
+   * Each new envelope schedules a debounced re-render, so this method is
+   * called repeatedly with progressively more populated results.
+   *
+   * Initial render therefore receives a scaffold of empty envelopes from
+   * `pipeline.buildScaffold()`, and the template re-renders as adapters
+   * resolve.
+   *
+   * Adapter result conventions (set in BuiltInExtensibilityLibrary):
+   *   - 'items'   → primary SharePoint list      → envelope { rows, paging }
+   *   - 'user'    → user profile                  → object spread under .user
+   *   - 'page'    → SharePoint page metadata      → object spread under .page
+   *   - additional list keys → envelope { rows, paging }
+   *   - HTTP endpoint keys   → raw data spread at root level
+   *   - '_social', '_formSubmit' → write-only, skipped
+   */
+  private getAllData(): ITemplateData {
+    // Parse URL query string parameters for templates (still surfaced under .query)
+    const query: Record<string, string> = {};
+    const params = new URLSearchParams(window.location.search);
+    params.forEach((value, key) => { query[key] = value; });
+
+    const configs = this.props.adapterConfigs || [];
+    const cfgByKey = new Map<string, { adapterId: string }>();
+    for (const c of configs) cfgByKey.set(c.key, { adapterId: c.adapterId });
+
+    // Pull the canonical results
+    const itemsResult = this._adapterResults.items;
+    const userResult = this._adapterResults.user;
+    const pageResult = this._adapterResults.page;
+
+    // Build primary items envelope (matches legacy IDataEnvelope shape)
+    const primaryEnvelope: IDataEnvelope = {
+      rows: Array.isArray(itemsResult?.data) ? itemsResult.data as any[] : [],
+      paging: {
+        hasNext: !!itemsResult?.paging?.hasNext,
+        hasPrev: !!itemsResult?.paging?.hasPrev,
+        nextHref: itemsResult?.paging?.nextToken,
+        prevHref: itemsResult?.paging?.prevToken,
+        pageNumber: itemsResult?.paging?.pageNumber
+      }
+    };
+
+    // Walk remaining adapter results and bucket by adapter type
+    const additionalListEnvelopes: Record<string, IDataEnvelope> = {};
+    const httpData: Record<string, any> = {};
+    for (const key of Object.keys(this._adapterResults)) {
+      if (key === 'items' || key === 'user' || key === 'page') continue;
+      if (key.startsWith('_')) continue; // write-only adapters
+      const cfg = cfgByKey.get(key);
+      const result = this._adapterResults[key];
+      if (!cfg || !result) continue;
+
+      if (cfg.adapterId === 'sharepoint-list') {
+        additionalListEnvelopes[key] = {
+          rows: Array.isArray(result.data) ? result.data : [],
+          paging: {
+            hasNext: !!result.paging?.hasNext,
+            hasPrev: !!result.paging?.hasPrev,
+            nextHref: result.paging?.nextToken,
+            prevHref: result.paging?.prevToken,
+            pageNumber: result.paging?.pageNumber
+          }
+        };
+      } else {
+        // HTTP / other read adapters — spread raw data at root
+        httpData[key] = result.data;
+      }
+    }
+
+    // Build template data — adapters are responsible for normalizing their
+    // own payloads (see UserProfileAdapter / PageDataAdapter).
     const templateData: ITemplateData = {
       items: primaryEnvelope,
-      user: ListDataService.normalizeData(this.props.userProfile || {}),
-      page: ListDataService.normalizeData(this.props.pageData || {}),
+      user: (userResult?.data as any) || {},
+      page: (pageResult?.data as any) || {},
       query,
       // Include instanceId for unique DOM element IDs when multiple web parts are on a page
       wpId: this.props.instanceId,
       instanceId: this.props.instanceId,
       siteUrl: this.props.site?.url || '',
-      ...dataSources,
-      ...httpData
+      ...additionalListEnvelopes,
+      ...httpData,
+      // SPFx Dynamic Data incoming items still surface to the template
+      ...(this.props.incomingItem ? { incoming: this.props.incomingItem } : {}),
+      ...(this.props.incomingItems ? { incomingItems: this.props.incomingItems } : {})
     };
 
     return templateData;
   }
 
-  /**
-   * Gets primary list data using the ListDataService
-   */
-  private async getPrimaryListData(tokenContext: ITokenContext): Promise<IListDataResult> {
-    const { site, list, view, viewXml, camlFilter } = this.props;
-
-    if (!this.listDataService || !site?.url || !list || !view) {
-      return { items: [], fromCache: false };
-    }
-
-    const resolvedFilter = camlFilter ? resolveTokens(camlFilter, tokenContext) : undefined;
-
-    return this.listDataService.getListData({
-      siteUrl: site.url,
-      listId: list,
-      viewId: view,
-      viewXml: viewXml || undefined,
-      camlFilter: resolvedFilter,
-      pagingToken: this.state.pagingToken
-    });
-  }
-
-  /**
-   * Gets all additional data sources using the ListDataService, wrapped in envelopes
-   */
-  private async getAdditionalDataSources(tokenContext: ITokenContext): Promise<Record<string, IDataEnvelope>> {
-    const { dataSources } = this.props;
-    const result: Record<string, IDataEnvelope> = {};
-
-    if (!this.listDataService || !dataSources || dataSources.length === 0) {
-      return result;
-    }
-
-    // Build configs for all data sources
-    const configs = dataSources
-      .filter((ds: IListDataSource & { siteUrl?: string }) => {
-        const siteUrl = ds.site?.url || ds.siteUrl;
-        return siteUrl && ds.listId && ds.viewId;
-      })
-      .map((ds: IListDataSource & { siteUrl?: string }) => ({
-        key: ds.key,
-        config: {
-          siteUrl: (ds.site?.url || ds.siteUrl) as string,
-          listId: ds.listId,
-          viewId: ds.viewId,
-          viewXml: ds.viewXml || undefined,
-          camlFilter: ds.camlFilter ? resolveTokens(ds.camlFilter, tokenContext) : undefined
-        },
-        timeoutMinutes: ds.cacheTimeoutMinutes
-      }));
-
-    // Fetch all data sources using the service
-    const fetchResults = await this.listDataService.getMultipleListData(configs);
-    
-    for (const key of Object.keys(fetchResults)) {
-      result[key] = HandlebarsListView.toEnvelope(fetchResults[key]);
-    }
-
-    return result;
-  }
-
-  /**
-   * Gets all HTTP endpoint data using the HttpDataService
-   */
-  private async getHttpEndpointData(tokenContext: ITokenContext): Promise<Record<string, any>> {
-    const { httpEndpoints } = this.props;
-    const result: Record<string, any> = {};
-
-    if (!this.httpDataService || !httpEndpoints || httpEndpoints.length === 0) {
-      return result;
-    }
-
-    // Filter valid endpoints (key and url required, auth validation done in service)
-    const validEndpoints = httpEndpoints.filter(
-      (ep: IHttpEndpointDataSource) => ep.key && ep.url
-    );
-
-    if (validEndpoints.length === 0) {
-      return result;
-    }
-
-    // Fetch all endpoints using the service
-    const fetchResults = await this.httpDataService.getMultipleHttpData(
-      validEndpoints.map(ep => ({
-        key: ep.key,
-        url: ep.url,
-        authType: ep.authType,
-        appId: ep.appId,
-        apiKeyHeaderName: ep.apiKeyHeaderName,
-        apiKeyValue: ep.apiKeyValue,
-        bearerToken: ep.bearerToken,
-        method: ep.method,
-        queryParams: ep.queryParams,
-        body: ep.body,
-        headers: ep.headers,
-        cacheTimeoutMinutes: ep.cacheTimeoutMinutes
-      })),
-      tokenContext
-    );
-    
-    for (const key of Object.keys(fetchResults)) {
-      const fetchResult = fetchResults[key];
-      if (fetchResult.error) {
-        console.error(`Error fetching HTTP endpoint '${key}':`, fetchResult.error);
-        result[key] = null;
-      } else {
-        result[key] = fetchResult.data;
-      }
-    }
-
-    return result;
-  }
-  
   public render(): React.ReactElement<IHandlebarsListViewProps> {
-    const { html, visible } = this.state;
-    return (
-      <div ref={this.containerRef}>
-        {visible ? <div dangerouslySetInnerHTML={{ __html: html }} /> : null}
-      </div>
-    );
+    // The active template engine renders directly into the container ref;
+    // React simply owns the host element.
+    return <div ref={this.containerRef} />;
   }
 }

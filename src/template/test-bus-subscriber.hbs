@@ -1,0 +1,99 @@
+{{!-- 
+  TEST: MessageBus Subscriber (Detail View)
+  ==========================================
+  Tests: topicContexts state, {{incoming.*}} template binding, guard pattern, clear reset
+  
+  Setup:
+  - Point at ANY list (or even leave unconfigured — this template only needs incoming data)
+  - Property pane → Dynamic Data → Subscribe Topics:
+      Topic: "selectedItem"   Context Key: "incoming"   On Receive: Merge   Enabled: ✓
+  - Place test-bus-publisher on the same page
+  
+  What to verify:
+  ✓ Before any click: shows "Waiting for selection" placeholder
+  ✓ After clicking a row in publisher: shows item detail with all fields
+  ✓ {{incoming.Title}}, {{incoming.ID}} etc. resolve correctly
+  ✓ Nested fields like {{incoming.Author.title}} resolve (MessageBus preserves nesting)
+  ✓ Clear button in publisher resets back to placeholder
+  ✓ Raw JSON dump shows the full envelope data for debugging
+--}}
+
+<style>
+  .sub-container-{{wpId}} {
+    font-family: var(--body-font, 'Segoe UI', sans-serif);
+    padding: 16px;
+  }
+  .sub-header-{{wpId}} {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #107c10;
+  }
+  .sub-title-{{wpId}} { font-size: 18px; font-weight: 600; color: #107c10; margin: 0; }
+  .sub-badge-{{wpId}} {
+    font-size: 11px; background: #107c10; color: #fff; padding: 2px 8px;
+    border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .sub-placeholder-{{wpId}} {
+    text-align: center; padding: 40px 20px; color: #a19f9d;
+    border: 2px dashed #e1dfdd; border-radius: 8px;
+  }
+  .sub-placeholder-{{wpId}} svg { width: 48px; height: 48px; margin-bottom: 12px; color: #c8c6c4; }
+  .sub-detail-{{wpId}} { display: grid; gap: 12px; }
+  .sub-field-{{wpId}} {
+    display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: baseline;
+    padding: 8px 0; border-bottom: 1px solid #edebe9;
+  }
+  .sub-label-{{wpId}} { font-size: 12px; color: #605e5c; text-transform: uppercase; letter-spacing: 0.5px; }
+  .sub-value-{{wpId}} { font-size: 14px; color: #323130; }
+  .sub-json-{{wpId}} {
+    margin-top: 16px; padding: 12px; background: #1e1e1e; color: #d4d4d4;
+    border-radius: 6px; font-family: 'Consolas', monospace; font-size: 12px;
+    max-height: 200px; overflow: auto; white-space: pre-wrap; word-break: break-all;
+  }
+  .sub-json-toggle-{{wpId}} {
+    margin-top: 12px; font-size: 12px; color: #0078d4; cursor: pointer;
+    border: none; background: none; padding: 0; text-decoration: underline;
+  }
+</style>
+
+<div class="sub-container-{{wpId}}">
+  <div class="sub-header-{{wpId}}">
+    <h3 class="sub-title-{{wpId}}">Subscriber — Item Detail</h3>
+    <span class="sub-badge-{{wpId}}">SUB ← selectedItem</span>
+  </div>
+
+  {{#if incoming.ID}}
+    <div class="sub-detail-{{wpId}}">
+      <div class="sub-field-{{wpId}}">
+        <span class="sub-label-{{wpId}}">ID</span>
+        <span class="sub-value-{{wpId}}">{{incoming.ID}}</span>
+      </div>
+      <div class="sub-field-{{wpId}}">
+        <span class="sub-label-{{wpId}}">Title</span>
+        <span class="sub-value-{{wpId}}">{{incoming.Title}}</span>
+      </div>
+      <div class="sub-field-{{wpId}}">
+        <span class="sub-label-{{wpId}}">Created</span>
+        <span class="sub-value-{{wpId}}">{{incoming.Created}}</span>
+      </div>
+      <div class="sub-field-{{wpId}}">
+        <span class="sub-label-{{wpId}}">Author</span>
+        <span class="sub-value-{{wpId}}">{{incoming.Author.title}} ({{incoming.Author.email}})</span>
+      </div>
+      <div class="sub-field-{{wpId}}">
+        <span class="sub-label-{{wpId}}">Modified</span>
+        <span class="sub-value-{{wpId}}">{{incoming.Modified}}</span>
+      </div>
+    </div>
+
+    <div class="sub-json-{{wpId}}">{{json incoming}}</div>
+
+  {{else}}
+    <div class="sub-placeholder-{{wpId}}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M15 15l6 6m-11-4a7 7 0 110-14 7 7 0 010 14z"/>
+      </svg>
+      <p>Waiting for selection…</p>
+      <p style="font-size: 12px;">Click a row in the Publisher web part to see details here.</p>
+    </div>
+  {{/if}}
+</div>

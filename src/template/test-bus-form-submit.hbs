@@ -1,0 +1,73 @@
+{{!-- 
+  TEST: Form Submit + MessageBus Publish
+  =======================================
+  Tests: <hbwp-smart-form> with data-topic, data-topic-action, onSuccess → messageBus.publish
+  
+  Setup:
+  - List: Any writable SharePoint list
+  - Property pane → Submit Endpoints:
+      Key: "addItem"   Type: SharePoint   List: (same list)
+  - Property pane → Dynamic Data → Publish Topics:
+      (not needed — the form publishes directly via data-topic attribute)
+  - Place test-bus-publisher (or any subscriber of "itemUpdated") on the same page
+  - The subscriber should have:
+      Subscribe Topics: Topic: "itemUpdated"   Context Key: "_refresh"   On Receive: Refresh   Enabled: ✓
+  
+  What to verify:
+  ✓ Form renders with all field types
+  ✓ Validation works (required fields, number min/max)
+  ✓ Successful submit creates item in SharePoint
+  ✓ On success, messageBus.publish fires with topic "itemUpdated", action "submit"
+  ✓ Subscriber re-fetches and shows the new item in its table
+  ✓ Form resets after success (data-reset-on-success="true")
+  ✓ Success message shows briefly
+--}}
+
+<style>
+  .form-test-{{wpId}} {
+    font-family: var(--body-font, 'Segoe UI', sans-serif);
+    padding: 16px;
+  }
+  .form-test-header-{{wpId}} {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #ca5010;
+  }
+  .form-test-title-{{wpId}} { font-size: 18px; font-weight: 600; color: #ca5010; margin: 0; }
+  .form-test-badge-{{wpId}} {
+    font-size: 11px; background: #ca5010; color: #fff; padding: 2px 8px;
+    border-radius: 12px; text-transform: uppercase;
+  }
+  .form-test-info-{{wpId}} {
+    margin-top: 12px; padding: 8px 12px; background: #f3f2f1;
+    border-radius: 4px; font-size: 12px; color: #605e5c;
+  }
+</style>
+
+<div class="form-test-{{wpId}}">
+  <div class="form-test-header-{{wpId}}">
+    <h3 class="form-test-title-{{wpId}}">Add Item Form</h3>
+    <span class="form-test-badge-{{wpId}}">PUB → itemUpdated (on submit)</span>
+  </div>
+
+  <hbwp-smart-form
+    data-wp-id="{{wpId}}"
+    data-endpoint="addItem"
+    data-title="Create New Item"
+    data-success-message="Item created successfully!"
+    data-submit-label="Create Item"
+    data-reset-on-success="true"
+    data-topic="itemUpdated"
+    data-topic-action="submit"
+  >
+    <hbwp-field data-name="Title" data-type="text" data-label="Title"
+               data-required="true" data-placeholder="Enter a title..." />
+  </hbwp-smart-form>
+
+  <div class="form-test-info-{{wpId}}">
+    <strong>Test checklist:</strong><br/>
+    1. Submit form → item appears in SharePoint list<br/>
+    2. Subscriber table refreshes automatically (topic: itemUpdated)<br/>
+    3. Form resets and shows success message<br/>
+    4. Submit with empty Title → validation error shown
+  </div>
+</div>

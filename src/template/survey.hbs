@@ -361,9 +361,9 @@
         
         <div id="formMessage-{{question.ID}}" class="form-message"></div>
         
-        {{#hbwp-form endpoint="submitSurvey" id=(concat "surveyForm-" question.ID)}}
-          {{hbwp-hidden name="QuestionId" value=question.ID}}
-          {{hbwp-hidden name="RespondentEmail" value=userProfile.Email}}
+        <hbwp-form data-endpoint="submitSurvey" data-wp-id="{{wpId}}" id="surveyForm-{{question.ID}}">
+          <hbwp-hidden name="QuestionId" value="{{question.ID}}"></hbwp-hidden>
+          <hbwp-hidden name="RespondentEmail" value="{{userProfile.Email}}"></hbwp-hidden>
           
           <div class="answer-options" id="options-{{question.ID}}">
             {{#each options}}
@@ -375,9 +375,9 @@
           </div>
           
           <div class="form-actions">
-            {{hbwp-submit label="Submit Vote" appearance="primary"}}
+            <hbwp-submit label="Submit Vote" appearance="primary"></hbwp-submit>
           </div>
-        {{/hbwp-form}}
+        </hbwp-form>
       </div>
     </fluent-tab-panel>
     

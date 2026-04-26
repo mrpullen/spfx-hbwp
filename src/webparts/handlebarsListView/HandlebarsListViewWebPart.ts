@@ -14,6 +14,7 @@ import {
   IPropertyPaneGroup
 } from '@microsoft/sp-property-pane';
 import { BaseClientSideWebPart } from '@microsoft/sp-webpart-base';
+import { IDynamicDataCallables, IDynamicDataPropertyDefinition } from '@microsoft/sp-dynamic-data';
 //import { IReadonlyTheme } from '@microsoft/sp-component-base';
 
 import * as strings from 'HandlebarsListViewWebPartStrings';
@@ -21,7 +22,6 @@ import HandlebarsListView from './components/HandlebarsListView';
 import { IListDataSource, IHttpEndpointDataSource, IQueryParameter, ISubmitEndpoint, HttpAuthType, SubmitEndpointType, CloudEnvironment, FLOW_RESOURCE_URIS } from './components/IHandlebarsListViewProps';
 import { PropertyFieldSitePicker, PropertyFieldListPicker, PropertyFieldListPickerOrderBy, IPropertyFieldSite } from '@pnp/spfx-property-controls';
 import { PropertyFieldViewPicker, PropertyFieldViewPickerOrderBy } from '@pnp/spfx-property-controls/lib/PropertyFieldViewPicker';
-
 
 import { PropertyFieldCodeEditor, PropertyFieldCodeEditorLanguages } from '@pnp/spfx-property-controls/lib/PropertyFieldCodeEditor';
 import { PropertyFieldFilePicker, IFilePickerResult } from '@pnp/spfx-property-controls/lib/PropertyFieldFilePicker';
@@ -35,7 +35,9 @@ import { AssignFrom } from "@pnp/core";
 import { LogLevel, PnPLogging } from "@pnp/logging";
 import { allComponents, provideFluentDesignSystem } from '@fluentui/web-components';
 import { Carousel } from '@mrpullen/fluentui-carousel';
-import { UserProfileService, IUserProfile, PageDataService, CacheService } from './services';
+import { UserProfileService, IUserProfile, PageDataService, CacheService, ExtensibilityService, buildPlatformServices, buildAdapterConfigs } from './services';
+import { IExtensibilityLibraryConfig, IMessageBus, getMessageBus, ITemplateEnginePropertyDefinition, TemplateEngineBase } from '@mrpullen/spfx-extensibility';
+import { BuiltInExtensibilityLibrary } from '../../extensions';
 
 /** Extended data source interface to include site picker data */
 interface IDataSourceConfig {
@@ -65,12 +67,18 @@ export interface IHandlebarsListViewWebPartProps {
   httpEndpointCount: number;
   /** Cloud environment for Power Automate Flow endpoints */
   cloudEnvironment: CloudEnvironment;
+  /** Selected template engine ID (defaults to 'handlebars') */
+  templateEngine: string;
+  /** Extensibility library configurations */
+  extensibilityLibraries: IExtensibilityLibraryConfig[];
+  /** Number of extensibility library entries */
+  extensibilityLibraryCount: number;
   // Dynamic properties for data sources and HTTP endpoints will be added at runtime
   [key: string]: any;
 }
 
 
-export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHandlebarsListViewWebPartProps> {
+export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHandlebarsListViewWebPartProps> implements IDynamicDataCallables {
 
   private sp?: SPFI = undefined;
   private userProfile?: IUserProfile = undefined;
@@ -79,6 +87,32 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
   private pageDataService?: PageDataService = undefined;
   private resolvedTemplate: string = '';
   private camlValidationResult: string = '';
+  private extensibilityService: ExtensibilityService = new ExtensibilityService();
+  private _messageBus: IMessageBus = getMessageBus();
+  /** Last selected item — exposed via IDynamicDataCallables */
+  private _selectedItem: Record<string, any> | undefined;
+  /** Last filter context — exposed via IDynamicDataCallables */
+  private _filterContext: Record<string, any> | undefined;
+
+  // ── IDynamicDataCallables ──
+
+  public getPropertyDefinitions(): ReadonlyArray<IDynamicDataPropertyDefinition> {
+    return [
+      { id: 'selectedItem', title: 'Selected Item' },
+      { id: 'filterContext', title: 'Filter Context' }
+    ];
+  }
+
+  public getPropertyValue(propertyId: string): any {
+    switch (propertyId) {
+      case 'selectedItem':
+        return this._selectedItem;
+      case 'filterContext':
+        return this._filterContext;
+      default:
+        return undefined;
+    }
+  }
 
   /**
    * Extracts the <Where> clause from ViewXml, returning the ViewXml without it
@@ -174,6 +208,9 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
   protected async onInit(): Promise<void> {
     this.sp = spfi().using(SPFx(this.context)).using(PnPLogging(LogLevel.Warning));
     provideFluentDesignSystem().register(allComponents, Carousel);
+
+    // Register this web part as a dynamic data source
+    this.context.dynamicDataSourceManager.initializeSource(this);
     
     // Initialize user profile service and load user profile
     this.userProfileService = new UserProfileService(this.sp);
@@ -214,8 +251,92 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
     if (this.properties.httpEndpointCount === undefined) {
       this.properties.httpEndpointCount = 0;
     }
+    if (this.properties.extensibilityLibraryCount === undefined) {
+      this.properties.extensibilityLibraryCount = 0;
+    }
+    if (!this.properties.templateEngine) {
+      this.properties.templateEngine = 'handlebars';
+    }
+
+    // Register built-in helpers and web components through the extensibility pipeline
+    this.extensibilityService.registerBuiltInLibrary(new BuiltInExtensibilityLibrary());
+
+    // Load external extensibility libraries
+    await this.loadExtensibilityLibraries();
     
     return super.onInit();
+  }
+
+  /**
+   * Builds the extensibility library configs from property pane fields and loads them.
+   */
+  private async loadExtensibilityLibraries(): Promise<void> {
+    const configs = this.buildExtensibilityLibraryConfigs();
+    if (configs.length > 0) {
+      await this.extensibilityService.loadLibraries(configs);
+    }
+    // Always register web components (built-in + external)
+    this.extensibilityService.registerWebComponents();
+  }
+
+  private buildExtensibilityLibraryConfigs(): IExtensibilityLibraryConfig[] {
+    const configs: IExtensibilityLibraryConfig[] = [];
+    const count = this.properties.extensibilityLibraryCount || 0;
+    for (let i = 0; i < count; i++) {
+      const id = this.properties[`ext${i}Id`] as string;
+      const name = this.properties[`ext${i}Name`] as string;
+      const enabled = this.properties[`ext${i}Enabled`] !== false;
+      if (id) {
+        configs.push({ id, name: name || id, enabled });
+      }
+    }
+    return configs;
+  }
+
+  private addExtensibilityLibrary(): void {
+    this.properties.extensibilityLibraryCount = (this.properties.extensibilityLibraryCount || 0) + 1;
+    this.context.propertyPane.refresh();
+  }
+
+  private removeExtensibilityLibrary(): void {
+    if (this.properties.extensibilityLibraryCount > 0) {
+      const index = this.properties.extensibilityLibraryCount - 1;
+      delete this.properties[`ext${index}Id`];
+      delete this.properties[`ext${index}Name`];
+      delete this.properties[`ext${index}Enabled`];
+      this.properties.extensibilityLibraryCount--;
+      this.context.propertyPane.refresh();
+      this.loadExtensibilityLibraries().then(() => this.render()).catch(err => console.error('Error reloading extensibility libraries:', err));
+    }
+  }
+
+  private buildExtensibilityPropertyGroups(): IPropertyPaneGroup[] {
+    const groups: IPropertyPaneGroup[] = [];
+    const count = this.properties.extensibilityLibraryCount || 0;
+    for (let i = 0; i < count; i++) {
+      groups.push({
+        groupName: `Library ${i + 1}`,
+        groupFields: [
+          PropertyPaneTextField(`ext${i}Id`, {
+            label: 'Component Manifest ID',
+            description: 'The GUID from the library\'s .manifest.json file',
+            value: this.properties[`ext${i}Id`] || ''
+          }),
+          PropertyPaneTextField(`ext${i}Name`, {
+            label: 'Display Name',
+            description: 'Friendly name for this library',
+            value: this.properties[`ext${i}Name`] || ''
+          }),
+          PropertyPaneToggle(`ext${i}Enabled`, {
+            label: 'Enabled',
+            onText: 'On',
+            offText: 'Off',
+            checked: this.properties[`ext${i}Enabled`] !== false
+          })
+        ]
+      });
+    }
+    return groups;
   }
 
   private clearCache(): void {
@@ -285,16 +406,19 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
   }
 
   /**
-   * Gets the effective template (file takes precedence over inline)
+   * Gets the effective template string. File-based content (loaded async by
+   * `loadTemplateFromFile` into `this.resolvedTemplate`) wins; otherwise the
+   * active engine resolves the template from its own stored shape via
+   * `engine.resolveTemplate(properties)`.
    */
   private getEffectiveTemplate(): string {
     if (this.properties.templateFile && this.properties.templateFile.fileAbsoluteUrl && this.resolvedTemplate) {
-      console.log(`[HBWP Template] Using file template (${this.resolvedTemplate.length} chars) from: ${this.properties.templateFile.fileAbsoluteUrl}`);
       return this.resolvedTemplate;
     }
-    const inline = this.properties.template || '';
-    console.log(`[HBWP Template] Using inline template (${inline.length} chars)`);
-    return inline;
+    const engineId = this.properties.templateEngine || 'handlebars';
+    const engine = this.extensibilityService.createTemplateEngine(engineId);
+    if (engine) return engine.resolveTemplate(this.properties);
+    return (this.properties.template as string) || '';
   }
 
   private addDataSource(): void {
@@ -462,6 +586,27 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
     const httpEndpoints = this.buildHttpEndpointsArray();
     const submitEndpoints = this.buildSubmitEndpointsArray();
     const effectiveTemplate = this.getEffectiveTemplate();
+
+    // Build adapter infrastructure via factory functions
+    const platformServices = buildPlatformServices({ sp: this.sp, webPartContext: this.context });
+    const adapterConfigs = buildAdapterConfigs({
+      sites: this.properties.sites,
+      list: this.properties.list,
+      view: this.properties.view,
+      viewXml: this.properties.viewXml,
+      camlFilter: this.properties.camlFilter,
+      enableCache: this.properties.enableCache,
+      cacheTimeoutMinutes: this.properties.cacheTimeoutMinutes,
+      cloudEnvironment: this.properties.cloudEnvironment,
+      dataSources,
+      httpEndpoints,
+      submitEndpoints,
+      sp: this.sp
+    });
+
+    // Resolve SPFx Dynamic Data consumer values (if wired via property pane)
+    const incomingItem = this.properties.incomingItem?.tryGetValue?.() as Record<string, any> | undefined;
+    const incomingItems = this.properties.incomingItems?.tryGetValue?.() as Record<string, any>[] | undefined;
     
     if(this.properties && this.properties.sites && this.properties.sites.length > 0) {
     const element: React.ReactElement<any> = React.createElement(
@@ -486,7 +631,14 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
         },
         userProfile: this.userProfile,
         pageData: this.pageData,
-        instanceId: this.context.instanceId
+        instanceId: this.context.instanceId,
+        extensibilityService: this.extensibilityService,
+        templateEngine: this.properties.templateEngine || 'handlebars',
+        messageBus: this._messageBus,
+        incomingItem,
+        incomingItems,
+        platformServices,
+        adapterConfigs
       }
     );
     ReactDom.unmountComponentAtNode(this.domElement);
@@ -517,23 +669,154 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
   }
 
   /**
-   * Handles template file property changes
+   * Declares incomingItem and incomingItems as SPFx Dynamic Data consumer properties.
+   * This enables the "Connect to a dynamic data source" UI in the property pane.
    */
-  private onTemplateFileChange(propertyPath: string, oldValue: any, newValue: any): void {
-    this.properties.templateFile = newValue;
-    this.loadTemplateFromFile().then(() => {
-      this.render();
-    }).catch(err => console.error('Error loading template:', err));
+  protected get propertiesMetadata(): any {
+    return {
+      'incomingItem':  { dynamicPropertyType: 'object' },
+      'incomingItems': { dynamicPropertyType: 'array'  }
+    };
   }
 
   /**
-   * Clears the selected template file
+   * Build property pane fields for the active template engine by asking the
+   * engine itself which properties it needs (engine.getPropertyDefinitions()).
+   * Each engine declares its own property surface; the web part renders them
+   * dynamically here so non-Handlebars engines can contribute their own UI.
+   *
+   * Reads/writes go through `engine.getPropertyValue` / `engine.setPropertyValue`
+   * so the engine owns its storage shape (string vs structured object, etc.).
    */
-  private clearTemplateFile(): void {
-    this.properties.templateFile = undefined as any;
-    this.resolvedTemplate = '';
-    this.context.propertyPane.refresh();
-    this.render();
+  private renderTemplateEngineFields(): any[] {
+    const engineId = this.properties.templateEngine || 'handlebars';
+    const engine = this.extensibilityService.createTemplateEngine(engineId);
+    if (!engine) return [];
+
+    const defs = (engine.getPropertyDefinitions() || [])
+      .slice()
+      .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+
+    // Disable code/multiline/text editors when a sibling filePicker has a value
+    // (current Handlebars UX preserved: file overrides inline editor).
+    const filePickerWithValue = defs.find(d => {
+      if (d.type !== 'filePicker') return false;
+      const v = engine.getPropertyValue(d.propertyName, this.properties) as IFilePickerResult | undefined;
+      return !!v?.fileAbsoluteUrl;
+    });
+    const disableEditors = !!filePickerWithValue;
+
+    const fields: any[] = [];
+    for (const def of defs) {
+      fields.push(...this.renderEngineField(engine, def, disableEditors));
+    }
+    return fields;
+  }
+
+  /**
+   * Maps a single ITemplateEnginePropertyDefinition to one or more SPFx
+   * property pane fields. All read/write goes through the engine's accessors.
+   */
+  private renderEngineField(engine: TemplateEngineBase, def: ITemplateEnginePropertyDefinition, disableEditors: boolean): any[] {
+    const propName = def.propertyName;
+    const read = (): any => engine.getPropertyValue(propName, this.properties);
+    const write = (val: any): void => engine.setPropertyValue(propName, val, this.properties);
+
+    switch (def.type) {
+      case 'filePicker': {
+        const current = read() as IFilePickerResult | undefined;
+        const onPicked = (val: IFilePickerResult): void => {
+          write(val);
+          this.loadTemplateFromFile().then(() => this.render()).catch(err => console.error('Error loading template:', err));
+        };
+        return [
+          PropertyFieldFilePicker(propName, {
+            context: this.context as any,
+            filePickerResult: current as IFilePickerResult,
+            onPropertyChange: (_path: string, _old: any, val: any) => onPicked(val),
+            properties: this.properties,
+            onSave: onPicked,
+            onChanged: onPicked,
+            key: `${propName}PickerId`,
+            buttonLabel: `Select ${def.label}`,
+            label: def.label,
+            accepts: def.accepts || [],
+            buttonIcon: 'FileTemplate'
+          }),
+          PropertyPaneLabel(`${propName}Info`, {
+            text: current?.fileName ? `Using file: ${current.fileName}` : (def.description || '')
+          }),
+          PropertyPaneButton(`${propName}Clear`, {
+            text: `Clear ${def.label}`,
+            buttonType: PropertyPaneButtonType.Normal,
+            onClick: () => {
+              write(undefined);
+              this.resolvedTemplate = '';
+              this.context.propertyPane.refresh();
+              this.render();
+            },
+            disabled: !current?.fileAbsoluteUrl
+          })
+        ];
+      }
+      case 'code': {
+        const lang = (def.language && (PropertyFieldCodeEditorLanguages as any)[def.language])
+          || PropertyFieldCodeEditorLanguages.Handlebars;
+        return [
+          PropertyFieldCodeEditor(propName, {
+            label: def.label,
+            panelTitle: def.label,
+            initialValue: read() ?? def.defaultValue,
+            onPropertyChange: (_path: string, _old: any, val: any) => {
+              write(val);
+              this.onPropertyPaneFieldChanged(propName, _old, val);
+            },
+            properties: this.properties,
+            disabled: disableEditors,
+            key: `${propName}CodeEditorId`,
+            language: lang,
+            options: { wrap: true, fontSize: 14 }
+          }),
+          ...(def.description ? [PropertyPaneLabel(`${propName}Help`, { text: def.description })] : [])
+        ];
+      }
+      case 'multiline':
+        return [PropertyPaneTextField(propName, {
+          label: def.label,
+          multiline: true,
+          rows: 6,
+          value: read() ?? def.defaultValue,
+          description: def.description,
+          disabled: disableEditors
+        })];
+      case 'text':
+        return [PropertyPaneTextField(propName, {
+          label: def.label,
+          value: read() ?? def.defaultValue,
+          description: def.description
+        })];
+      case 'toggle':
+        return [PropertyPaneToggle(propName, {
+          label: def.label,
+          checked: read() ?? def.defaultValue
+        })];
+      case 'dropdown':
+        return [PropertyPaneDropdown(propName, {
+          label: def.label,
+          options: def.options || [],
+          selectedKey: read() ?? def.defaultValue
+        })];
+      case 'slider':
+        return [PropertyPaneSlider(propName, {
+          label: def.label,
+          min: def.min ?? 0,
+          max: def.max ?? 100,
+          step: def.step ?? 1,
+          value: read() ?? def.defaultValue ?? 0
+        })];
+      default:
+        return [];
+    }
   }
 
   protected getPropertyPaneConfiguration(): IPropertyPaneConfiguration {
@@ -541,6 +824,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
     const dataSourceGroups = this.buildDataSourcePropertyGroups();
     const httpEndpointGroups = this.buildHttpEndpointPropertyGroups();
     const submitEndpointGroups = this.buildSubmitEndpointPropertyGroups();
+    const extensibilityGroups = this.buildExtensibilityPropertyGroups();
     
     return {
       pages: [
@@ -640,54 +924,15 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
             {
               groupName: strings.TemplateGroupName,
               groupFields: [
-                PropertyFieldFilePicker('templateFile', {
-                  context: this.context as any,
-                  filePickerResult: this.properties.templateFile,
-                  onPropertyChange: this.onTemplateFileChange.bind(this),
-                  properties: this.properties,
-                  onSave: (e: IFilePickerResult) => { 
-                    this.properties.templateFile = e;
-                    this.loadTemplateFromFile().then(() => this.render()).catch(err => console.error('Error loading template:', err));
-                  },
-                  onChanged: (e: IFilePickerResult) => { 
-                    this.properties.templateFile = e;
-                    this.loadTemplateFromFile().then(() => this.render()).catch(err => console.error('Error loading template:', err));
-                  },
-                  key: 'templateFilePickerId',
-                  buttonLabel: 'Select Template File',
-                  label: 'Template File (.hbs)',
-                  accepts: ['.hbs', '.handlebars', '.html', '.txt'],
-                  buttonIcon: 'FileTemplate'
+                PropertyPaneDropdown('templateEngine', {
+                  label: 'Template Engine',
+                  options: this.extensibilityService.getTemplateEngineDefinitions().map(def => ({
+                    key: def.engineId,
+                    text: def.engineName
+                  })),
+                  selectedKey: this.properties.templateEngine || 'handlebars'
                 }),
-                PropertyPaneLabel('templateFileInfo', {
-                  text: this.properties.templateFile?.fileName 
-                    ? `Using file: ${this.properties.templateFile.fileName}` 
-                    : 'No file selected. Using inline template below.'
-                }),
-                PropertyPaneButton('clearTemplateFile', {
-                  text: 'Clear Template File',
-                  buttonType: PropertyPaneButtonType.Normal,
-                  onClick: this.clearTemplateFile.bind(this),
-                  disabled: !this.properties.templateFile?.fileAbsoluteUrl
-                }),
-                PropertyFieldCodeEditor('template', {
-                  label: 'Inline Handlebars Template',
-                  panelTitle: 'Handlebars Code',
-                  initialValue: this.properties.template,
-                  onPropertyChange: this.onPropertyPaneFieldChanged.bind(this),
-                  properties: this.properties,
-                  disabled: !!this.properties.templateFile?.fileAbsoluteUrl,
-                  key: 'codeEditorFieldId',
-                  language: PropertyFieldCodeEditorLanguages.Handlebars,
-                  options: {
-                    wrap: true,
-                    fontSize: 14
-                    // more options
-                  }
-                }),
-                PropertyPaneLabel('templateHelp', {
-                  text: 'Tip: Upload .hbs files to a SharePoint library and select them above for easier template management.'
-                })
+                ...this.renderTemplateEngineFields()
               ]
             },
             {
@@ -828,92 +1073,39 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
         },
         {
           header: {
-            description: 'Configure additional data sources with site, list, and view pickers'
+            description: 'Register extensibility libraries (SPFx library components) to add custom web components and Handlebars helpers'
           },
           groups: [
             {
-              groupName: 'Manage Data Sources',
+              groupName: 'Extensibility Libraries',
               groupFields: [
-                PropertyPaneLabel('dataSourcesInfo', {
-                  text: `You have ${this.properties.dataSourceCount || 0} additional data source(s) configured.`
+                PropertyPaneLabel('extInfo', {
+                  text: `You have ${this.properties.extensibilityLibraryCount || 0} extensibility library/libraries registered.`
                 }),
-                PropertyPaneButton('addDataSource', {
-                  text: 'Add Data Source',
+                PropertyPaneButton('addExtLibrary', {
+                  text: 'Add Library',
                   buttonType: PropertyPaneButtonType.Primary,
-                  onClick: this.addDataSource.bind(this)
+                  onClick: this.addExtensibilityLibrary.bind(this)
                 }),
-                PropertyPaneButton('removeDataSource', {
-                  text: 'Remove Last Data Source',
+                PropertyPaneButton('removeExtLibrary', {
+                  text: 'Remove Last Library',
                   buttonType: PropertyPaneButtonType.Normal,
-                  onClick: this.removeDataSource.bind(this),
-                  disabled: (this.properties.dataSourceCount || 0) === 0
+                  onClick: this.removeExtensibilityLibrary.bind(this),
+                  disabled: (this.properties.extensibilityLibraryCount || 0) === 0
                 }),
-                PropertyPaneLabel('dataSourcesHelp', {
-                  text: 'Access in template: {{#each keyName}}...{{/each}}. Primary list: {{#each items}}...{{/each}}. User: {{user.displayName}}. Page: {{page.Title}}. CAML filters support {{user.*}} and {{page.*}} tokens.'
+                PropertyPaneButton('reloadExtLibraries', {
+                  text: 'Reload Libraries',
+                  buttonType: PropertyPaneButtonType.Normal,
+                  onClick: () => {
+                    this.loadExtensibilityLibraries().then(() => this.render()).catch(err => console.error('Error reloading extensibility libraries:', err));
+                  }
+                }),
+                PropertyPaneLabel('extHelp', {
+                  text: 'Deploy your SPFx library component to the app catalog, then enter its manifest ID here. The library must implement IExtensibilityLibrary from @mrpullen/spfx-extensibility. Web components defined in the library will be available as custom HTML elements in your Handlebars templates.'
                 })
               ]
             },
-            ...dataSourceGroups
-          ]
-        },
-        {
-          header: {
-            description: 'Configure HTTP endpoints with AAD authentication'
-          },
-          groups: [
-            {
-              groupName: 'Manage HTTP Endpoints',
-              groupFields: [
-                PropertyPaneLabel('httpEndpointsInfo', {
-                  text: `You have ${this.properties.httpEndpointCount || 0} HTTP endpoint(s) configured.`
-                }),
-                PropertyPaneButton('addHttpEndpoint', {
-                  text: 'Add HTTP Endpoint',
-                  buttonType: PropertyPaneButtonType.Primary,
-                  onClick: this.addHttpEndpoint.bind(this)
-                }),
-                PropertyPaneButton('removeHttpEndpoint', {
-                  text: 'Remove Last Endpoint',
-                  buttonType: PropertyPaneButtonType.Normal,
-                  onClick: this.removeHttpEndpoint.bind(this),
-                  disabled: (this.properties.httpEndpointCount || 0) === 0
-                }),
-                PropertyPaneLabel('httpEndpointsHelp', {
-                  text: 'Access in template: {{#each keyName}}...{{/each}}. Use tokens like {{user.email}} in URL/params.'
-                })
-              ]
-            },
-            ...httpEndpointGroups
-          ]
-        },
-        {
-          header: {
-            description: 'Configure submit endpoints for form data'
-          },
-          groups: [
-            {
-              groupName: 'Manage Submit Endpoints',
-              groupFields: [
-                PropertyPaneLabel('submitEndpointsInfo', {
-                  text: `You have ${this.properties.submitEndpointCount || 0} submit endpoint(s) configured.`
-                }),
-                PropertyPaneButton('addSubmitEndpoint', {
-                  text: 'Add Submit Endpoint',
-                  buttonType: PropertyPaneButtonType.Primary,
-                  onClick: this.addSubmitEndpoint.bind(this)
-                }),
-                PropertyPaneButton('removeSubmitEndpoint', {
-                  text: 'Remove Last Endpoint',
-                  buttonType: PropertyPaneButtonType.Normal,
-                  onClick: this.removeSubmitEndpoint.bind(this),
-                  disabled: (this.properties.submitEndpointCount || 0) === 0
-                }),
-                PropertyPaneLabel('submitEndpointsHelp', {
-                  text: 'Use in template: {{#hbwp-form endpoint="keyName"}}...{{hbwp-submit label="Submit"}}{{/hbwp-form}}'
-                })
-              ]
-            },
-            ...submitEndpointGroups
+            ...extensibilityGroups
           ]
         }
       ]

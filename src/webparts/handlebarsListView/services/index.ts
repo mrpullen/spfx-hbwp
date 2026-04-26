@@ -1,7 +1,5 @@
-export * from './CacheService';
-export * from './UserProfileService';
-export * from './PageDataService';
-export * from './ListDataService';
-export * from './HttpDataService';
-export * from './FormSubmitService';
-export * from './SocialDataService';
+// Adapter-facing services have moved to src/extensions/services
+export * from '../../../extensions/services';
+export * from './ExtensibilityService';
+export * from './DataAdapterPipeline';
+export * from './PlatformServicesFactory';
