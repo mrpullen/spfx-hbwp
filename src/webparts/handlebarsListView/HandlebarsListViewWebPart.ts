@@ -272,9 +272,10 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
    */
   private async loadExtensibilityLibraries(): Promise<void> {
     const configs = this.buildExtensibilityLibraryConfigs();
-    if (configs.length > 0) {
-      await this.extensibilityService.loadLibraries(configs);
-    }
+    // Always call loadLibraries — even with zero external configs it seeds
+    // `_libraries` from the registered built-in libraries so their adapters
+    // and web components are visible to the pipeline.
+    await this.extensibilityService.loadLibraries(configs);
     // Always register web components (built-in + external)
     this.extensibilityService.registerWebComponents();
   }
