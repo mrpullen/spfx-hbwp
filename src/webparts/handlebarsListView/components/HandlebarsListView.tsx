@@ -47,6 +47,8 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
   private _busUnsubs: (() => void)[] = [];
   /** Debounce timer for collapsing burst result updates into a single render */
   private _renderTimer: number | undefined;
+  /** Hash of the last rendered template data — skips renders when identical */
+  private _lastRenderedHash: string | undefined;
   /** The active template engine instance */
   private _templateEngine: TemplateEngineBase | undefined;
   /** Reactive state store scoped to this web part instance */
@@ -248,6 +250,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       this._pipeline?.dispose();
       this._pipeline = undefined;
       this._adapterResults = {};
+      this._lastRenderedHash = undefined;
 
       this.initPipeline();
 
@@ -356,7 +359,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
    */
   private scheduleRender = (): void => {
     clearTimeout(this._renderTimer);
-    this._renderTimer = window.setTimeout(() => this.renderTemplate(), 50);
+    this._renderTimer = window.setTimeout(() => this.renderTemplate(), 250);
   };
 
   // ── Data adapter pipeline ─────────────────────────────────────────────
@@ -434,6 +437,14 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     if (!this.containerRef.current) return;
 
     const templateData = this.getAllData();
+
+    // Skip if structurally identical to the previous render — avoids tearing
+    // down + recreating custom elements (and their skeleton flash) when
+    // multiple adapter envelopes resolve to the same merged data shape.
+    const hash = this._safeHash(templateData);
+    if (hash !== undefined && hash === this._lastRenderedHash) return;
+    this._lastRenderedHash = hash;
+
     const wpId = this.props.instanceId;
     const engineId = this.props.templateEngine || 'handlebars';
 
@@ -467,6 +478,18 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     };
 
     this._templateEngine.render(context, templateData, this.containerRef.current);
+  }
+
+  /**
+   * JSON-stringifies the template data for fast structural comparison.
+   * Returns undefined on circular refs etc., which forces a render through.
+   */
+  private _safeHash(data: unknown): string | undefined {
+    try {
+      return JSON.stringify(data);
+    } catch {
+      return undefined;
+    }
   }
 
   /**
