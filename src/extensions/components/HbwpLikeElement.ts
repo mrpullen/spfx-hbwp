@@ -211,16 +211,26 @@ export class HbwpLikeElement extends BaseWebComponent {
       this._countEl.textContent = newCount + (newCount === 1 ? ' Like' : ' Likes');
     }
 
-    // Fire-and-forget API call, then re-resolve to get authoritative count
+    // Fire-and-forget API call. We trust the optimistic state and don't
+    // re-resolve from the server — the round-trip + pub/sub re-render was
+    // causing a visible state-flicker (liked -> unliked -> liked -> unliked).
+    // The server count is derived from LikedBy length, so toggling locally
+    // is exact for the current user. Other viewers will pick up the change
+    // on their next resolve.
     ctx.executeWrite('_social', 'toggleLike', { siteUrl: ctx.siteUrl, listId: ctx.listId, itemId: Number(itemId), currentlyLiked: liked })
-      .then(() => this._resolveLiked())
       .catch((err: Error) => {
         console.error('[hbwp-like] toggleLike failed:', err);
         // Revert optimistic UI
         this.setAttribute('data-liked', String(liked));
+        this.setAttribute('title', liked ? 'You have liked this item, click to unlike it' : 'Click to like this item');
         if (this._heartEl) {
           this._heartEl.innerHTML = liked ? HEART_FILL_SVG : HEART_OUTLINE_SVG;
           this._heartEl.style.color = liked ? this._activeColor : this._inactiveColor;
+        }
+        if (this._countEl) {
+          const current = parseInt(this._countEl.textContent || '0', 10) || 0;
+          const reverted = liked ? current + 1 : Math.max(0, current - 1);
+          this._countEl.textContent = reverted + (reverted === 1 ? ' Like' : ' Likes');
         }
       });
   }

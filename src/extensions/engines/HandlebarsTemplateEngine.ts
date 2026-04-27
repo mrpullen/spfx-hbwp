@@ -62,12 +62,26 @@ export class HandlebarsTemplateEngine extends TemplateEngineBase {
     // Scope CSS classes in <style> blocks with the web part instance ID
     const scopedTemplate = scopeCssClasses(context.template, context.instanceId);
 
-    // Compile and render
+    // Compile + render into a detached buffer first (double-buffered render).
+    // This keeps the previous DOM mounted right up until the moment we swap,
+    // eliminating the "blank flash" between renders.  Custom elements still
+    // get destroyed + recreated (Handlebars is string-based — see
+    // docs/custom-element-rerender-flicker.md) but the page never paints
+    // an empty container.
     const compiled = Handlebars.compile(scopedTemplate);
     const html = compiled(data);
-    host.innerHTML = html;
 
-    // Bind PageState interactions on the rendered DOM
+    const buffer = document.createElement('div');
+    buffer.innerHTML = html;
+
+    // Move children from buffer → host in a single mutation batch:
+    //   1. Detach all current children
+    //   2. Append the new children
+    // We do this inside one synchronous block so the browser only paints once.
+    while (host.firstChild) host.removeChild(host.firstChild);
+    while (buffer.firstChild) host.appendChild(buffer.firstChild);
+
+    // Bind PageState interactions on the freshly-mounted DOM
     this._bindStateActions(host, context.pageState);
     this._bindStateVisibility(host, context.pageState);
     this._bindStatePanels(host, context.pageState);
