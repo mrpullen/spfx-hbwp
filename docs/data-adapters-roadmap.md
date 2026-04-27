@@ -35,9 +35,19 @@ Before adding any adapter, check that it passes these tests:
 ### RssDataAdapter
 
 **What it does.** Fetches RSS / Atom / RDF feeds and normalizes to a
-uniform `{ items: [{ title, link, date, author, summary, thumbnail, categories }] }`
-shape. Handles XML parsing, ATOM-vs-RSS variations, and an optional
-CORS-proxy URL prefix in config.
+uniform `{ items: [{ title, link, guid, date, author, summary, thumbnail, categories }] }`
+shape. Handles XML parsing and ATOM-vs-RSS variations behind one shape.
+Operations:
+
+- `fetch` — paged feed read (`pageSize`, `page` config; returns
+  `{ items, page, pageSize, totalItems? }`).
+- `getByLink` — single item by exact link match.
+- `getByGuid` — single item by GUID/ID.
+- `since` — items newer than a timestamp (for incremental updates).
+
+Config: feed URL, optional CORS-proxy URL prefix, cache TTL, max items,
+user-agent override. Honors the endpoint allow-list and audit sink from
+the HTTP governance plan.
 
 **End-user value.**
 - Surface news, blog posts, vendor announcements, and external thought
@@ -206,14 +216,32 @@ task state changes. Companion to `TodosAdapter`.
 
 **What it does.** Reads user presence via Graph
 `/users/{id}/presence` and bulk
-`/communications/getPresencesByUserId`. Lightweight, polls or
-subscribes for changes. Read-only.
+`/communications/getPresencesByUserId`. Two modes:
+
+- **Polling mode** (default) — lightweight, configurable interval, fine
+  for small batches.
+- **Live mode** — subscribes to Graph change notifications for presence
+  via the streaming infrastructure (see "Real-time / streaming adapters"
+  below). Emits an envelope the moment presence changes; no polling.
+  Required when watching many users or when freshness matters (active
+  call boards, floor plans).
+
+Normalized envelope: `{ userId, availability, activity, statusMessage,
+lastSeen, source: 'poll' | 'live' }`. Read-only.
 
 **End-user value.**
 - "Who's available now" widgets paired with people directories.
 - Presence badges on author bylines.
-- Office floor plans that show who's in.
-- One of the most-asked-for SharePoint UX additions.
+- Office floor plans that show who's in — dots flip live as people
+  join/leave meetings.
+- Active-call awareness on customer-service pages so a manager sees
+  agent status without refreshing.
+- One of the most-asked-for SharePoint UX additions, and the live mode
+  is the difference between "useful" and "magic."
+
+**Dependency.** Live mode requires `GraphSubscriptionAdapter`
+infrastructure (customer-owned webhook receiver + SignalR fan-out) per
+the streaming plan. Polling mode works standalone.
 
 ---
 
@@ -229,6 +257,115 @@ event calendars, conference schedules). Normalizes to the same shape as
 - Industry conference schedules embedded on a community-of-practice site.
 - Vendor maintenance windows on an IT operations page.
 - Cheap to ship because it shares the Calendar adapter's output shape.
+
+---
+
+## Tier 1.5 — Real-time / streaming adapters
+
+These adapters hold an open connection and emit envelopes as data
+arrives, instead of fetching on demand. They depend on a cross-cutting
+`streaming` capability flag and message-bus changes (connection
+multiplexing, render coalescing, memory bounds, reconnection
+semantics, governance rate limits). Detailed plan to be written as
+`docs/realtime-streaming-plan.md` before implementation.
+
+### SseDataAdapter
+
+**What it does.** Generic Server-Sent Events client. Author configures
+an SSE URL, optional auth, event-name filter, and a JSON shape. Adapter
+manages connection lifecycle, automatic reconnect with exponential
+back-off, and per-instance multiplexing so all template subscribers
+share one underlying connection.
+
+**End-user value.**
+- Drop-in real-time for any customer-owned backend (Azure SignalR
+  Service in SSE mode, custom Function App, log shipper).
+- Same property-pane experience as the HTTP adapter — paste a URL, pick
+  auth, done.
+- One adapter underpins every SSE-driven web component
+  (`<hbwp-ticker>`, `<hbwp-livefeed>`, live charts).
+
+### AppInsightsLiveAdapter
+
+**What it does.** Purpose-built for Azure Application Insights and Log
+Analytics live streams. Operations: `live` (open stream, emit envelopes
+for every matching event), `historical` (one-shot KQL backfill),
+`aggregateLive` (server-side count/avg/p95 emitted at a configurable
+cadence). AAD auth.
+
+**End-user value.**
+- Live operational dashboards on a SharePoint admin page — errors per
+  minute, top failing endpoints, geographic distribution — without
+  context-switching to Azure portal.
+- KPI tiles for support / ops teams that update in real time during
+  incidents.
+- Pairs with `<hbwp-chart>` live mode for live charts and
+  `<hbwp-counter>` for big-number metrics.
+
+### StockTickerAdapter
+
+**What it does.** Provider-strategy adapter (Finnhub WebSocket, Polygon.io
+WebSocket, AlphaVantage polling fallback) emitting a uniform
+`{ symbol, price, change, timestamp }` envelope per tick. Replaces
+Fab 40 "Stock Info" with something that's actually live.
+
+**End-user value.**
+- Live tickers on finance / corporate-comms pages.
+- Configurable watch lists per page; admin governance via the same
+  endpoint allow-list as HTTP.
+- Pairs with `<hbwp-ticker>` and `<hbwp-sparkline>`.
+
+### GraphSubscriptionAdapter
+
+**What it does.** Microsoft Graph change-notification subscriptions
+routed to the browser via a customer-owned webhook receiver +
+SignalR / SSE fan-out. Underpins every "live Graph data" scenario —
+presence, mailbox, list changes, Teams messages.
+
+**End-user value.**
+- **Live presence** without polling (powers `TeamsPresenceAdapter` live
+  mode).
+- Live SP list updates — a Kanban board reflects edits instantly across
+  collaborators.
+- New Teams channel messages flow into a "what's happening" widget the
+  moment they arrive.
+- Mailbox count badge that decrements in real time.
+
+**Dependency.** Customer must deploy the webhook-receiver function we
+ship as a sample. The browser cannot receive Graph webhooks directly.
+
+### SignalRAdapter
+
+**What it does.** Generic Azure SignalR client for customer-built
+backends. Pure passthrough — customer defines the hub methods and
+event shapes; adapter publishes envelopes per event.
+
+**End-user value.**
+- Customer engineering teams build their own real-time backend (event
+  bus, IoT pipeline, business app) and surface it on SP pages without
+  writing a web part.
+- Two-way capable — templates can `executeWrite` to invoke hub methods.
+
+### MqttAdapter
+
+**What it does.** Browser-side MQTT client (over WebSockets) for IoT
+scenarios. Subscribes to one or more topics, emits envelopes per message.
+
+**End-user value.**
+- Factory-floor / OT dashboards on SharePoint: machine status, sensor
+  readings, line OEE.
+- Smart-building widgets: room occupancy, HVAC, energy use.
+- Niche but distinctive — nothing else in the SP ecosystem ships this.
+
+### WebSocketAdapter
+
+**What it does.** Generic two-way WebSocket client. Send-and-receive
+semantics for protocols that don't fit SSE.
+
+**End-user value.**
+- Last-resort transport when SSE doesn't fit and the customer can't
+  use SignalR.
+- Powers chat-style components and collaborative-editing scenarios.
 
 ---
 
@@ -290,10 +427,23 @@ event calendars, conference schedules). Normalizes to the same shape as
 5. **ExcelRangeAdapter** — punches above its weight for power users.
 6. **OrgChartAdapter** — feeds the Org Chart web component.
 7. **TodosAdapter** + **PlannerAdapter** — paired "my work" view.
-8. **TeamsPresenceAdapter** + **TeamsChannelAdapter** — paired Teams story.
+8. **TeamsPresenceAdapter** (polling mode) + **TeamsChannelAdapter** —
+   paired Teams story. Live mode added once `GraphSubscriptionAdapter`
+   ships.
 9. **ODataV4Adapter** + **GraphQLAdapter** — unlock every enterprise
    integration without writing per-system adapters.
-10. **SoapAdapter** — last; niche, finicky authoring UX.
+10. **Streaming infrastructure** — `streaming` capability flag,
+    connection multiplexing, render coalescing, governance rate limits.
+    Plan written before code (`docs/realtime-streaming-plan.md`).
+11. **SseDataAdapter** + **`<hbwp-ticker>`** + **`<hbwp-chart>` live
+    mode** — vertical slice that proves the streaming architecture.
+12. **AppInsightsLiveAdapter** — first high-value streaming application.
+13. **GraphSubscriptionAdapter** + **TeamsPresenceAdapter live mode** —
+    unlocks live presence boards, live list updates, live mailbox.
+14. **StockTickerAdapter** — replaces Fab 40 Stock Info with real ticks.
+15. **SignalRAdapter** / **MqttAdapter** / **WebSocketAdapter** — as
+    customer demand drives.
+16. **SoapAdapter** — last; niche, finicky authoring UX.
 
 ## Cross-adapter scenarios to test
 
@@ -310,3 +460,8 @@ working together. Use them as integration smoke tests:
    + Jira on one IT page.
 5. **Personalized homepage** — User + Calendar + Todos + ContextHistory →
    Copilot summarizes "your morning so far".
+6. **Live ops board** — AppInsightsLive + StockTicker + GraphSubscription
+   (presence) on one page, validating connection multiplexing, render
+   coalescing, and the eight-layer governance model under streaming load.
+7. **Live presence floor plan** — TeamsPresence live mode + OrgChart +
+   floor-plan SVG template, dots flipping the moment users join calls.

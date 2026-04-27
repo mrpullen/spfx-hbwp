@@ -90,11 +90,13 @@ Add to `HelperManager`:
 - `{{qrcode value size=120}}` — qrcode-generator (bundled, tiny)
 - `{{relativeTime date}}` — already exists in some form; verify
 - `{{truncate text length=200}}`
-- `{{rss xmlString}}` — parses RSS/Atom XML to a JS array (used by the HTTP
-  adapter's response when pointed at an RSS endpoint)
 
 All helper dependencies are `npm install`'d into the helper package and
 shipped in the SPFx bundle. No runtime fetches.
+
+RSS/Atom parsing lives in `RssDataAdapter`, not in a Handlebars helper —
+the adapter normalizes feeds to JSON so templates only ever see a uniform
+shape. See `data-adapters-roadmap.md`.
 
 ### 4. Generic chart web component
 
@@ -187,7 +189,7 @@ items inline, done.
 |---|---|
 | Tweets Feed | **Service replacement.** Twitter/X feed widgets are paywalled. Replace with **Mastodon**, **Bluesky**, or **LinkedIn organization feed** via HTTP adapter. Document Twitter widget embed as a template option (works for users who still pay). |
 | Social Share | Template only — render share links to LinkedIn/Facebook/email/X with `window.location` injected. No external service needed. |
-| RSS Reader | HTTP adapter pointed at RSS URL (via customer-owned proxy if CORS-blocked) + `{{rss}}` helper that parses XML → JSON. Template renders feed items. |
+| RSS Reader | Dedicated **`RssDataAdapter`** (Tier 1 in `data-adapters-roadmap.md`) — fetches RSS / Atom / RDF, normalizes to a uniform JSON shape, supports paging (`pageSize` / `page` config) and item lookup by link/guid (`getByLink`, `getByGuid` operations). CORS handled via customer-owned proxy URL prefix in config. Template renders feed items. |
 | Social Photo Stream | **Service replacement / per-provider.** Original used Instagram/Pinterest/Flickr/Picasa. Modern reality: Picasa is dead, Instagram requires OAuth. Practical alternatives: **Unsplash** (public API, no key), **Pexels**, **Flickr** (still has API), **SharePoint asset library**. Each is just an HTTP adapter config + a template. |
 
 ### Charts and graphs (7)
@@ -245,22 +247,72 @@ Photopile lightbox-on-click.
 | Stock Info | See Charts section. |
 | QR Code | `{{qrcode value size=120}}` helper. Trivial. |
 
-### Replacement for ~~FckText~~
+### People and org (new category — promoted from "FckText replacement")
 
-We dropped FckText (modern pages cover it). Suggested replacement to keep
-the count at 40:
+These were originally listed as FckText replacement candidates. They are
+worth shipping as **first-class templates** rather than slot-fillers
+because they're consistently the most-asked-for SharePoint UX additions
+and they exercise nearly every Tier 1 adapter we're planning.
 
-- **Countdown / Event Timer** — `<hbwp-countdown to="2026-12-31T00:00:00Z">`
-  with live-updating days/hours/minutes/seconds. Common ask, easy to ship.
-- **Org Chart** — `<hbwp-orgchart>` using a UPS adapter for the reporting
-  hierarchy. High-value for intranets.
-- **People Tile** — already partially implied; render any user with avatar,
-  name, title, presence. Pairs well with `UserProfileAdapter`.
-- **Knowledge Base Search** — search-driven web part using SP search adapter
-  + result template.
+| Template | Strategy |
+|---|---|
+| **Org Chart** | `<hbwp-orgchart>` web component fed by `OrgChartAdapter`. Renders manager/peers/direct-reports as an interactive tree (zoom, expand, search). Click a node → publishes `selectedUser` topic; other components on the page (People Tile, Calendar, Mail) react. Always-asked-for. Replaces a half-dozen third-party intranet web parts. |
+| **People Tile / Persona** | `<hbwp-persona>` web component fed by `UserProfileAdapter` + optional Tier 1 adapter join. Sizes: `xsmall` (avatar only) → `xlarge` (full card). Configurable surface composed from data slices the page already has, governed by the standard endpoint allow-list. See "Persona composition" below. |
+| **Knowledge Base Search** | Search-driven template using `SearchAdapter` (Graph search) + a result-card template. Auto-complete via `suggest` operation. Click result → publishes `selectedDocument`; pairs with Copilot for grounded chat over results. |
+| **Countdown / Event Timer** | `<hbwp-countdown to="2026-12-31T00:00:00Z">`. Live-updating days/hours/minutes/seconds. No external data needed. Cheap, common ask. |
 
-Pick one of these to fill the FckText slot. **Org Chart** has the most
-"wow" and the lowest external-dependency risk.
+#### Persona composition
+
+`<hbwp-persona>` is the showcase for "data adapters working together."
+The component takes a `data-user-id` (or resolves from a topic like
+`selectedUser`) and **composes its surface from data slices the page
+already has subscribed**. Each slice is independently opt-in via
+component attributes:
+
+| Slice | Source adapter | What it shows |
+|---|---|---|
+| Identity | `UserProfileAdapter` | Avatar, display name, job title, department, location |
+| Presence | `TeamsPresenceAdapter` | Live availability dot + status message |
+| Reach-out | (composed) | Buttons: Chat in Teams, Email, Call (deeplinks; no API call needed) |
+| Calendar | `CalendarAdapter` | "Next meeting" / "in a meeting until 2:00pm" / "free until 3:30" |
+| Recent activity | `ContextHistoryAdapter` (target user, where permitted) | Last shared file, last edited doc — only when admin policy permits |
+| Reports | `OrgChartAdapter` | Manager + N direct reports inline |
+| Recent messages | `TeamsChannelAdapter` (read) | Last public messages from this user — admin-gated |
+| Mail snippet | `MailAdapter` | Only for the current user looking at *their own* persona — most-recent inbox subject lines |
+| Skills / About | `UserProfileAdapter` extended | Bio, skills, schools — from UPS or Delve |
+| Files | `OneDriveFilesAdapter` | Recent files this user shared with the current viewer |
+
+The component is **declarative composition** of these slices via
+attributes:
+
+```handlebars
+<hbwp-persona
+  data-user-id="{{selectedUser.id}}"
+  data-size="large"
+  data-show-presence="true"
+  data-show-calendar="true"
+  data-show-reports="true"
+  data-show-recent-activity="false"
+  data-actions="chat,email,call">
+</hbwp-persona>
+```
+
+Each enabled slice subscribes to its adapter's topic for the user; the
+component re-renders incrementally as data arrives (uses the same
+debounce/dedupe pipeline as the host web part so flicker stays bounded).
+Slices that fail (permission denied, adapter disabled, allow-list miss)
+fail **silently and gracefully** — the persona still renders without that
+slice rather than blocking the whole card.
+
+Governance: the persona honors the same eight-layer model. An admin who
+disables `MailAdapter` or restricts `ContextHistoryAdapter` causes those
+slices to omit themselves automatically. The component's property pane
+shows authors which slices their tenant policy permits before they save.
+
+End-user value: a single `<hbwp-persona>` becomes the unifying UI for
+people across the intranet — search results, org chart nodes, document
+authors, comment authors, email-from headers — and everywhere it appears
+it's live, actionable, and policy-governed.
 
 ---
 
@@ -290,21 +342,28 @@ pattern.
 
 1. **Property controls integration** (collection data, color, icon, image,
    file pickers). Unlocks ~10 web parts.
-2. **External script loader** + **`<hbwp-chart>`**. Unlocks Pie/Bar/Line/Radar/Polar/Stock.
-3. **Helper pack** (markdown, syntax, qrcode, rss, truncate). Unlocks Markdown,
-   Syntax Highlighter, QR Code, RSS Reader.
+2. **`<hbwp-chart>`** web component (Chart.js bundled, dynamic-imported).
+   Unlocks Pie/Bar/Line/Radar/Polar/Stock.
+3. **Helper pack** (markdown, syntax, qrcode, truncate). Unlocks Markdown,
+   Syntax Highlighter, QR Code.
+3a. **`RssDataAdapter`** (Tier 1 in `data-adapters-roadmap.md`). Unlocks
+    RSS Reader and any feed-driven template.
 4. **Swiper-based components** (`<hbwp-carousel>`, `<hbwp-slider>`).
    Unlocks News Carousel, News Slider, Slider Gallery, Simple Carousel.
 5. **Media components** (`<hbwp-media>`, `<hbwp-equalizer>`).
 6. **Text components** (`<hbwp-tabs>`, `<hbwp-accordion>`, `<hbwp-typewriter>`,
    `<hbwp-arc-text>`, `<hbwp-text-rotator>`).
 7. **Image components** (`<hbwp-image-puzzle>`, lightbox helper for galleries).
-8. **3D / coverflow** (lower priority, niche).
-9. **Service-replacement adapters as needed** (RSS feed proxy, AlphaVantage,
-   Azure Translator, Mastodon/Bluesky). Each is just an HTTP adapter config
-   shipped as a sample.
-10. **Org Chart** (replacement for FckText slot).
-11. **Simple Poll** + survey-list mode.
+8. **`<hbwp-persona>` + `OrgChartAdapter` + `<hbwp-orgchart>`** — the
+   people story. Persona starts with identity + presence + reach-out
+   actions; additional slices light up as their adapters ship.
+9. **`<hbwp-countdown>`** — trivial, ships alongside the people work.
+10. **3D / coverflow** (lower priority, niche).
+11. **Service-replacement adapters as needed** (AlphaVantage, Azure
+    Translator, Mastodon/Bluesky). Each is just an HTTP adapter config
+    shipped as a sample.
+12. **Knowledge Base Search** template — depends on `SearchAdapter`.
+13. **Simple Poll** + survey-list mode.
 
 ## What we are explicitly *not* building
 
