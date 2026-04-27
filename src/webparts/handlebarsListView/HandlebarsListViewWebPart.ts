@@ -36,7 +36,7 @@ import { LogLevel, PnPLogging } from "@pnp/logging";
 import { allComponents, provideFluentDesignSystem } from '@fluentui/web-components';
 import { Carousel } from '@mrpullen/fluentui-carousel';
 import { UserProfileService, IUserProfile, PageDataService, CacheService, ExtensibilityService, buildPlatformServices, buildAdapterConfigs } from './services';
-import { IExtensibilityLibraryConfig, IMessageBus, getMessageBus, ITemplateEnginePropertyDefinition, TemplateEngineBase } from '@mrpullen/spfx-extensibility';
+import { IExtensibilityLibraryConfig, IMessageBus, getMessageBus, ITemplateEnginePropertyDefinition, ITemplateAssetDefinition, TemplateEngineBase } from '@mrpullen/spfx-extensibility';
 import { BuiltInExtensibilityLibrary } from '../../extensions';
 
 /** Extended data source interface to include site picker data */
@@ -105,6 +105,8 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
   private _topicInbox: Record<string, any> = {};
   /** Active bus unsubscribe callbacks for configured topic subscriptions */
   private _topicUnsubs: Array<() => void> = [];
+  /** Cached library template list for the active engine (refreshed each property pane render) */
+  private _libraryTemplates: ITemplateAssetDefinition[] = [];
 
   // ── IDynamicDataCallables ──
 
@@ -186,6 +188,21 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
     // Topic subscription field changed → re-wire bus subscriptions and re-render
     if (/^sub\d+(Topic|Alias|Enabled)$/.test(propertyPath)) {
       this.refreshTopicSubscriptions();
+      this.render();
+    }
+
+    // Library template picker changed → copy template content to inline editor
+    if (propertyPath === 'libraryTemplate' && newValue !== oldValue) {
+      if (newValue) {
+        const tpl = this._libraryTemplates.find(t => t.id === newValue);
+        if (tpl?.content) {
+          this.properties.template = tpl.content;
+          // Clear file-based template so inline wins
+          this.properties.templateFile = undefined as any;
+          this.resolvedTemplate = '';
+        }
+      }
+      this.context.propertyPane.refresh();
       this.render();
     }
   }
@@ -800,6 +817,39 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
    * Reads/writes go through `engine.getPropertyValue` / `engine.setPropertyValue`
    * so the engine owns its storage shape (string vs structured object, etc.).
    */
+
+  /**
+   * Renders a "Library Templates" dropdown that lists all templates
+   * contributed by loaded extensibility libraries for the active engine.
+   * Selecting a template populates the inline editor with its content.
+   */
+  private renderLibraryTemplatePicker(): any[] {
+    const engineId = this.properties.templateEngine || 'handlebars';
+    const allTemplates = this.extensibilityService.getTemplates();
+    const filtered = allTemplates.filter(t => (t.engineId || 'handlebars') === engineId);
+
+    if (filtered.length === 0) return [];
+
+    // Cache the filtered list for use in onPropertyPaneFieldChanged
+    this._libraryTemplates = filtered;
+
+    const options = [
+      { key: '', text: '(none — use editor below)' },
+      ...filtered.map(t => ({
+        key: t.id,
+        text: t.name + (t.description ? ` — ${t.description}` : '')
+      }))
+    ];
+
+    return [
+      PropertyPaneDropdown('libraryTemplate', {
+        label: 'Library Templates',
+        options,
+        selectedKey: this.properties.libraryTemplate || ''
+      })
+    ];
+  }
+
   private renderTemplateEngineFields(): any[] {
     const engineId = this.properties.templateEngine || 'handlebars';
     const engine = this.extensibilityService.createTemplateEngine(engineId);
@@ -1045,6 +1095,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
                   })),
                   selectedKey: this.properties.templateEngine || 'handlebars'
                 }),
+                ...this.renderLibraryTemplatePicker(),
                 ...this.renderTemplateEngineFields()
               ]
             },

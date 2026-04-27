@@ -3,6 +3,7 @@ import {
   IExtensibilityLibrary,
   IComponentDefinition,
   ITemplateEngineDefinition,
+  ITemplateAssetDefinition,
   IDataAdapterDefinition,
   EngineExtensionConstructor,
   TemplateEngineBase
@@ -43,6 +44,7 @@ import {
   HttpDataAdapter
 } from './adapters';
 import { HandlebarsHelpersExtension } from './engines/HandlebarsHelpersExtension';
+import { newsCardsTemplate, simpleTableTemplate } from './templates';
 
 /**
  * Built-in extensibility library providing HBWP's core Handlebars helpers
@@ -93,6 +95,25 @@ export class BuiltInExtensibilityLibrary implements IExtensibilityLibrary {
       ToIntHelperExtension,
       ModHelperExtension,
       ShuffleHelperExtension,
+    ];
+  }
+
+  public getTemplates(): ITemplateAssetDefinition[] {
+    return [
+      {
+        id: 'news-cards',
+        name: 'News Cards',
+        content: newsCardsTemplate,
+        engineId: 'handlebars',
+        description: 'Responsive card grid for news/announcements with image, title, author and excerpt.'
+      },
+      {
+        id: 'simple-table',
+        name: 'Simple Table',
+        content: simpleTableTemplate,
+        engineId: 'handlebars',
+        description: 'Clean striped table showing Title, Modified date, and Editor columns.'
+      }
     ];
   }
 

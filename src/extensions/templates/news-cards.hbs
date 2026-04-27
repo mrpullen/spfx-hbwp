@@ -1,0 +1,39 @@
+{{!-- News Cards Template --}}
+<style>
+  .hbwp-news { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; padding: 8px 0; }
+  .hbwp-news-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; transition: box-shadow 0.15s; }
+  .hbwp-news-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.12); }
+  .hbwp-news-card-img { width: 100%; height: 180px; object-fit: cover; background: #f3f2f1; display: block; }
+  .hbwp-news-card-body { padding: 16px; }
+  .hbwp-news-card-title { font-size: 16px; font-weight: 600; color: #242424; margin: 0 0 6px; line-height: 1.3; }
+  .hbwp-news-card-title a { color: inherit; text-decoration: none; }
+  .hbwp-news-card-title a:hover { text-decoration: underline; }
+  .hbwp-news-card-meta { font-size: 12px; color: #616161; margin-bottom: 8px; }
+  .hbwp-news-card-desc { font-size: 13px; color: #424242; line-height: 1.5; }
+</style>
+
+<div class="hbwp-news">
+  {{#each items.rows}}
+    <div class="hbwp-news-card">
+      {{#if BannerImageUrl}}
+        <img class="hbwp-news-card-img" src="{{BannerImageUrl.Url}}" alt="{{Title}}" />
+      {{else}}
+        <div class="hbwp-news-card-img" style="display:flex;align-items:center;justify-content:center;color:#a19f9d;font-size:13px;">No image</div>
+      {{/if}}
+      <div class="hbwp-news-card-body">
+        <h3 class="hbwp-news-card-title">
+          {{#if FileRef}}<a href="{{FileRef}}">{{Title}}</a>{{else}}{{Title}}{{/if}}
+        </h3>
+        <div class="hbwp-news-card-meta">
+          {{#if Author}}By {{Author.Title}} &middot; {{/if}}
+          {{#if Modified}}{{Modified}}{{/if}}
+        </div>
+        {{#if Description}}
+          <div class="hbwp-news-card-desc">{{substring Description 0 150}}{{#if (gt Description.length 150)}}&hellip;{{/if}}</div>
+        {{/if}}
+      </div>
+    </div>
+  {{else}}
+    <div style="padding:20px;color:#616161;">No items found.</div>
+  {{/each}}
+</div>
