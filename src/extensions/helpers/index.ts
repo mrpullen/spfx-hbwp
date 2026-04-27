@@ -1,16 +1,10 @@
 // Data helpers
-export { registerJsonHelper } from './json';
-export { registerFilterHelper } from './filter';
-export { registerPercentageHelper } from './percentage';
-export { registerSubstringHelper } from './substring';
-export { registerConcatHelper } from './concat';
-export { registerStarRatingHelper } from './starRating';
-export { registerToIntHelper } from './toInt';
-export { registerModHelper } from './mod';
-export { registerShuffleHelper } from './shuffle';
-
-// Social helpers
-export { registerSocialHelpers } from './socialHelpers';
-
-// Paging helpers
-export { registerPagingHelpers } from './pagingHelpers';
+export { JsonHelperExtension } from './json';
+export { FilterHelperExtension } from './filter';
+export { PercentageHelperExtension } from './percentage';
+export { SubstringHelperExtension } from './substring';
+export { ConcatHelperExtension } from './concat';
+export { StarRatingHelperExtension } from './starRating';
+export { ToIntHelperExtension } from './toInt';
+export { ModHelperExtension } from './mod';
+export { ShuffleHelperExtension } from './shuffle';

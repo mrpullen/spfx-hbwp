@@ -1,11 +1,19 @@
-import * as Handlebars from 'handlebars';
+import { HandlebarsExtension } from '../engines/HandlebarsExtension';
 
-export function registerSubstringHelper(hbs: typeof Handlebars): void {
-  hbs.registerHelper('substring', function(str: string, start: number, end?: number) {
-    if (!str || typeof str !== 'string') return '';
-    if (end !== undefined) {
-      return str.substring(start, end);
-    }
-    return str.substring(start);
-  });
+export class SubstringHelperExtension extends HandlebarsExtension {
+  public static readonly engineId = 'handlebars';
+
+  public register(): void {
+    this.hbs.registerHelper('substring', function(str: string, start: number, end?: number) {
+      if (!str || typeof str !== 'string') return '';
+      if (end !== undefined) {
+        return str.substring(start, end);
+      }
+      return str.substring(start);
+    });
+  }
+
+  public unregister(): void {
+    this.hbs.unregisterHelper('substring');
+  }
 }

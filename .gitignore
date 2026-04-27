@@ -35,3 +35,6 @@ obj
 
 # Local tenant-specific API permissions (not committed)
 config/webApiPermissions-config.json
+
+# Local planning notes (not committed)
+planning/

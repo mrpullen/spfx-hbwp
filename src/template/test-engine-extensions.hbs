@@ -1,0 +1,192 @@
+{{!--
+  Engine Extension Smoke Test
+  ===========================
+  Tests every built-in EngineExtension class registered through
+  the BuiltInExtensibilityLibrary → HandlebarsTemplateEngine pipeline.
+
+  Drop on any SharePoint list — works with or without items.
+--}}
+
+<style>
+  .smoke { font-family: 'Segoe UI', system-ui, sans-serif; padding: 20px; max-width: 960px; }
+  .smoke h1 { font-size: 22px; color: #0078d4; border-bottom: 2px solid #0078d4; padding-bottom: 8px; }
+  .smoke .info { font-size: 13px; color: #616161; margin-bottom: 16px; }
+  .test { border: 1px solid #e0e0e0; border-left: 4px solid #0078d4; border-radius: 4px; padding: 12px 16px; margin-bottom: 12px; background: #fafafa; }
+  .test h3 { margin: 0 0 6px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 10px; color: #fff; font-weight: 600; }
+  .tag-builtin { background: #0078d4; }
+  .tag-3p { background: #5c2d91; }
+  .tag-social { background: #d83b01; }
+  .tag-paging { background: #498205; }
+  .mono { font-family: Consolas, monospace; font-size: 12px; background: #f3f2f1; padding: 1px 6px; border-radius: 3px; }
+  .out { background: #fff; padding: 8px 12px; border: 1px solid #e0e0e0; border-radius: 3px; margin-top: 6px; font-size: 13px; }
+  .expect { font-size: 12px; color: #616161; margin-top: 4px; }
+  pre.json { background: #1f1f1f; color: #d4d4d4; padding: 8px 12px; border-radius: 3px; font-size: 11px; max-height: 160px; overflow: auto; margin: 6px 0 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px; margin-top: 6px; }
+  .cell { padding: 6px 8px; border: 1px solid #e0e0e0; border-radius: 3px; font-size: 12px; text-align: center; }
+  .cell.even { background: #e7f3ff; }
+  .cell.odd { background: #fff4ce; }
+  .pill { display: inline-block; padding: 2px 8px; margin: 2px; background: #e7f3ff; border-radius: 3px; font-size: 12px; }
+</style>
+
+<div class="smoke">
+
+  <h1>Engine Extension Smoke Test</h1>
+  <div class="info">
+    Instance: <span class="mono">{{wpId}}</span>
+  </div>
+
+  {{!-- ── toInt ── --}}
+  <div class="test">
+    <h3><span class="tag tag-builtin">built-in</span> <span class="mono">toInt</span></h3>
+    <div class="out">
+      toInt "42" = <strong>{{toInt "42"}}</strong> &middot;
+      toInt "17xyz" = <strong>{{toInt "17xyz"}}</strong> &middot;
+      toInt "abc" = <strong>{{toInt "abc"}}</strong>
+    </div>
+    <div class="expect">Expected: 42, 17, 0</div>
+  </div>
+
+  {{!-- ── mod ── --}}
+  <div class="test">
+    <h3><span class="tag tag-builtin">built-in</span> <span class="mono">mod</span></h3>
+    <div class="out">
+      mod 10 3 = <strong>{{mod 10 3}}</strong> &middot;
+      mod 8 4 = <strong>{{mod 8 4}}</strong> &middot;
+      mod 7 2 = <strong>{{mod 7 2}}</strong>
+    </div>
+    <div class="expect">Expected: 1, 0, 1</div>
+  </div>
+
+  {{!-- ── percentage ── --}}
+  <div class="test">
+    <h3><span class="tag tag-builtin">built-in</span> <span class="mono">percentage</span></h3>
+    <div class="out">
+      percentage 3 4 = <strong>{{percentage 3 4}}</strong> &middot;
+      percentage 1 8 = <strong>{{percentage 1 8}}</strong> &middot;
+      percentage 0 0 = <strong>{{percentage 0 0}}</strong>
+    </div>
+    <div class="expect">Expected: 75, 13, 0</div>
+  </div>
+
+  {{!-- ── substring ── --}}
+  <div class="test">
+    <h3><span class="tag tag-builtin">built-in</span> <span class="mono">substring</span></h3>
+    <div class="out">
+      substring "Modernization" 0 6 = <strong>{{substring "Modernization" 0 6}}</strong> &middot;
+      substring "Handlebars" 6 = <strong>{{substring "Handlebars" 6}}</strong>
+    </div>
+    <div class="expect">Expected: "Modern", "bars"</div>
+  </div>
+
+  {{!-- ── concat ── --}}
+  <div class="test">
+    <h3><span class="tag tag-builtin">built-in</span> <span class="mono">concat</span></h3>
+    <div class="out">
+      concat "Hello" " " "World" = <strong>{{concat "Hello" " " "World"}}</strong>
+    </div>
+    <div class="expect">Expected: "Hello World"</div>
+  </div>
+
+  {{!-- ── starRating ── --}}
+  <div class="test">
+    <h3><span class="tag tag-builtin">built-in</span> <span class="mono">starRating</span></h3>
+    <div class="out">
+      starRating 4 = {{{starRating 4}}} &middot;
+      starRating 2.5 = {{{starRating 2.5}}} &middot;
+      starRating 0 = {{{starRating 0}}}
+    </div>
+    <div class="expect">Expected: filled/half/empty star characters</div>
+  </div>
+
+  {{!-- ── json ── --}}
+  <div class="test">
+    <h3><span class="tag tag-builtin">built-in</span> <span class="mono">json</span></h3>
+    <div class="out">First item as JSON:</div>
+    <pre class="json">{{json items.rows.[0]}}</pre>
+    <div class="expect">Expected: pretty-printed JSON of the first list item (or "undefined" if empty)</div>
+  </div>
+
+  {{!-- ── mod inside iteration ── --}}
+  <div class="test">
+    <h3><span class="tag tag-builtin">built-in</span> <span class="mono">mod</span> in iteration</h3>
+    <div class="grid">
+      {{#each items.rows}}
+        <div class="cell {{#if (mod @index 2)}}odd{{else}}even{{/if}}">
+          #{{@index}} {{Title}}
+        </div>
+      {{else}}
+        <div class="cell">(no items)</div>
+      {{/each}}
+    </div>
+    <div class="expect">Expected: alternating blue/yellow cells</div>
+  </div>
+
+  {{!-- ── shuffle ── --}}
+  <div class="test">
+    <h3><span class="tag tag-builtin">built-in</span> <span class="mono">shuffle</span></h3>
+    <div class="out">
+      {{#each (shuffle items.rows)}}
+        <span class="pill">{{Title}}</span>
+      {{else}}
+        (no items to shuffle)
+      {{/each}}
+    </div>
+    <div class="expect">Expected: items in random order — refresh to see them move</div>
+  </div>
+
+  {{!-- ── filter (block mode) ── --}}
+  <div class="test">
+    <h3><span class="tag tag-builtin">built-in</span> <span class="mono">filter</span> (block)</h3>
+    <div class="out">
+      {{#filter items.rows "ContentType" "Item"}}
+        <span>&#10003; Found items with ContentType = "Item"</span>
+      {{else}}
+        <span>No items with ContentType = "Item" (that's OK for this test)</span>
+      {{/filter}}
+    </div>
+    <div class="expect">Expected: match message or fallback — won't crash either way</div>
+  </div>
+
+  {{!-- ── handlebars-helpers: strings ── --}}
+  <div class="test">
+    <h3><span class="tag tag-3p">handlebars-helpers</span> String helpers</h3>
+    <div class="out">
+      uppercase "hello" = <strong>{{uppercase "hello"}}</strong> &middot;
+      lowercase "WORLD" = <strong>{{lowercase "WORLD"}}</strong>
+    </div>
+    <div class="expect">Expected: "HELLO", "world"</div>
+  </div>
+
+  {{!-- ── handlebars-helpers: math ── --}}
+  <div class="test">
+    <h3><span class="tag tag-3p">handlebars-helpers</span> Math helpers</h3>
+    <div class="out">
+      add 5 7 = <strong>{{add 5 7}}</strong> &middot;
+      subtract 100 25 = <strong>{{subtract 100 25}}</strong> &middot;
+      multiply 6 7 = <strong>{{multiply 6 7}}</strong>
+    </div>
+    <div class="expect">Expected: 12, 75, 42</div>
+  </div>
+
+  {{!-- ── handlebars-helpers: comparison ── --}}
+  <div class="test">
+    <h3><span class="tag tag-3p">handlebars-helpers</span> Comparison helpers</h3>
+    <div class="out">
+      eq 5 5 = <strong>{{#if (eq 5 5)}}true{{else}}false{{/if}}</strong> &middot;
+      gt 10 3 = <strong>{{#if (gt 10 3)}}true{{else}}false{{/if}}</strong> &middot;
+      or false true = <strong>{{#if (or false true)}}true{{else}}false{{/if}}</strong>
+    </div>
+    <div class="expect">Expected: true, true, true</div>
+  </div>
+
+  {{!-- ── Summary ── --}}
+  <div class="test" style="border-left-color: #107c10; background: #f3f9f1;">
+    <h3><span class="tag" style="background:#107c10;">DONE</span> Extension Pipeline Test Complete</h3>
+    <div class="expect" style="color: #242424;">
+      If every section above shows rendered output, all EngineExtension
+      classes registered correctly through the pipeline.
+    </div>
+  </div>
+
+</div>

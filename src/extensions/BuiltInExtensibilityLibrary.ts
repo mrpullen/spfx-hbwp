@@ -3,22 +3,20 @@ import {
   IExtensibilityLibrary,
   IComponentDefinition,
   ITemplateEngineDefinition,
-  IDataAdapterDefinition
+  IDataAdapterDefinition,
+  EngineExtensionConstructor,
+  TemplateEngineBase
 } from '@mrpullen/spfx-extensibility';
-import * as Handlebars from 'handlebars';
-import helpers from 'handlebars-helpers';
 import {
-  registerJsonHelper,
-  registerFilterHelper,
-  registerPercentageHelper,
-  registerSubstringHelper,
-  registerConcatHelper,
-  registerStarRatingHelper,
-  registerToIntHelper,
-  registerModHelper,
-  registerShuffleHelper,
-  registerSocialHelpers,
-  registerPagingHelpers
+  JsonHelperExtension,
+  FilterHelperExtension,
+  PercentageHelperExtension,
+  SubstringHelperExtension,
+  ConcatHelperExtension,
+  StarRatingHelperExtension,
+  ToIntHelperExtension,
+  ModHelperExtension,
+  ShuffleHelperExtension,
 } from './helpers';
 import {
   HbwpFormElement,
@@ -44,6 +42,7 @@ import {
   FormSubmitAdapter,
   HttpDataAdapter
 } from './adapters';
+import { HandlebarsHelpersExtension } from './engines/HandlebarsHelpersExtension';
 
 /**
  * Built-in extensibility library providing HBWP's core Handlebars helpers
@@ -75,24 +74,26 @@ export class BuiltInExtensibilityLibrary implements IExtensibilityLibrary {
     ];
   }
 
-  public registerHandlebarsCustomizations(hbs: typeof Handlebars): void {
-    // Third-party helpers (handlebars-helpers: 180+)
-    helpers({ handlebars: hbs });
+  /**
+   * Built-in Handlebars extensions — each helper category is its own
+   * EngineExtension class, following the same pattern external libraries use.
+   */
+  public getEngineExtensions(): EngineExtensionConstructor<TemplateEngineBase>[] {
+    return [
+      // Third-party helpers (handlebars-helpers: 180+)
+      HandlebarsHelpersExtension,
 
-    // Data helpers
-    registerJsonHelper(hbs);
-    registerFilterHelper(hbs);
-    registerPercentageHelper(hbs);
-    registerSubstringHelper(hbs);
-    registerConcatHelper(hbs);
-    registerStarRatingHelper(hbs);
-    registerToIntHelper(hbs);
-    registerModHelper(hbs);
-    registerShuffleHelper(hbs);
-
-    // Social & UI helpers
-    registerSocialHelpers(hbs);
-    registerPagingHelpers(hbs);
+      // Data helpers
+      JsonHelperExtension,
+      FilterHelperExtension,
+      PercentageHelperExtension,
+      SubstringHelperExtension,
+      ConcatHelperExtension,
+      StarRatingHelperExtension,
+      ToIntHelperExtension,
+      ModHelperExtension,
+      ShuffleHelperExtension,
+    ];
   }
 
   public getTemplateEngines(): ITemplateEngineDefinition[] {

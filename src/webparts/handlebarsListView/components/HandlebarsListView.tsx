@@ -6,7 +6,6 @@ import type { IHandlebarsListViewProps } from './IHandlebarsListViewProps';
 // data via the pipeline's data-changed envelopes.
 import { DataAdapterPipeline } from '../services';
 import { registerServiceContext, unregisterServiceContext, IServiceContext, IDataEnvelope as IMessageEnvelope, TemplateEngineBase, ITemplateEngineContext, getPageState, clearPageState, IPageState, IDataAdapterResult, IDataAdapterContext } from '@mrpullen/spfx-extensibility';
-import { HandlebarsTemplateEngine } from '../../../extensions/engines';
 
 interface IHandlebarsListViewState {}
 
@@ -140,6 +139,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
 
     // Destroy the template engine if it was active
     if (this._templateEngine && this.containerRef.current) {
+      this._templateEngine.uninstallExtensions();
       this._templateEngine.destroy(this.containerRef.current);
       this._templateEngine = undefined;
     }
@@ -451,16 +451,20 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     // Resolve or create the template engine via the extensibility service
     if (!this._templateEngine || this._templateEngine.engineId !== engineId) {
       if (this._templateEngine) {
+        this._templateEngine.uninstallExtensions();
         this._templateEngine.destroy(this.containerRef.current);
         this._templateEngine = undefined;
       }
       if (this.props.extensibilityService) {
         this._templateEngine = this.props.extensibilityService.createTemplateEngine(engineId);
 
-        // Handlebars engine needs a back-reference to the extensibility service
-        // so it can register custom helpers/partials at compile time.
-        if (this._templateEngine instanceof HandlebarsTemplateEngine) {
-          this._templateEngine.setExtensibilityService(this.props.extensibilityService);
+        // Engine init: hand it the flat extension list so it can register
+        // helpers / partials / components against its own registration root.
+        // Each engine filters by its own engineId — engine-agnostic mount.
+        if (this._templateEngine) {
+          this._templateEngine.installExtensions(
+            this.props.extensibilityService.getEngineExtensions()
+          );
         }
       }
     }

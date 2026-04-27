@@ -5,9 +5,10 @@ import {
   IExtensibilityLibraryConfig,
   ITemplateEngineDefinition,
   IDataAdapterDefinition,
+  ITemplateAssetDefinition,
+  EngineExtensionConstructor,
   TemplateEngineBase
 } from '@mrpullen/spfx-extensibility';
-import * as Handlebars from 'handlebars';
 
 /**
  * Service responsible for loading extensibility libraries (SPFx library
@@ -22,8 +23,8 @@ export class ExtensibilityService {
 
   /**
    * Registers a built-in (non-SPFx-loaded) library so it participates in
-   * the same registerHandlebarsCustomizations / registerWebComponents pipeline
-   * as external libraries loaded from the app catalog.
+   * the same engine-extension / web-component pipeline as external
+   * libraries loaded from the app catalog.
    */
   public registerBuiltInLibrary(library: IExtensibilityLibrary): void {
     this._builtInLibraries.push(library);
@@ -82,20 +83,39 @@ export class ExtensibilityService {
   }
 
   /**
-   * Calls `registerHandlebarsCustomizations` on every loaded library so they
-   * can register helpers / partials in the web part's Handlebars namespace.
+   * Aggregates engine-scoped extensions from every loaded library into a
+   * flat list. Engines call this from their render / mount path and
+   * filter by their own `engineId` to consume the extensions they
+   * understand.
    */
-  public registerHandlebarsCustomizations(handlebarsNamespace: typeof Handlebars): void {
+  public getEngineExtensions(): EngineExtensionConstructor<TemplateEngineBase>[] {
+    const out: EngineExtensionConstructor<TemplateEngineBase>[] = [];
     for (const lib of this._libraries) {
       try {
-        if (lib.registerHandlebarsCustomizations) {
-          lib.registerHandlebarsCustomizations(handlebarsNamespace);
-          console.log(`[HBWP Extensibility] Registered Handlebars customizations from: ${lib.name()}`);
-        }
+        const exts = lib.getEngineExtensions?.() ?? [];
+        out.push(...exts);
       } catch (error) {
-        console.error(`[HBWP Extensibility] Error registering Handlebars customizations from ${lib.name()}:`, error);
+        console.error(`[HBWP Extensibility] Error collecting engine extensions from ${lib.name()}:`, error);
       }
     }
+    return out;
+  }
+
+  /**
+   * Aggregates ready-to-use template assets from every loaded library.
+   * Used by the property-pane template picker.
+   */
+  public getTemplates(): ITemplateAssetDefinition[] {
+    const out: ITemplateAssetDefinition[] = [];
+    for (const lib of this._libraries) {
+      try {
+        const templates = lib.getTemplates?.() ?? [];
+        out.push(...templates);
+      } catch (error) {
+        console.error(`[HBWP Extensibility] Error collecting templates from ${lib.name()}:`, error);
+      }
+    }
+    return out;
   }
 
   /** Returns all component definitions collected from loaded libraries. */

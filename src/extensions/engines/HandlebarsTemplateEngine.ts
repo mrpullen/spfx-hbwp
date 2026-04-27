@@ -5,10 +5,11 @@ import {
   ITemplateEngineContext,
   ITemplateEnginePropertyDefinition,
   ITemplateEngineCallbacks,
-  IPageState
+  IPageState,
+  EngineExtension,
+  EngineExtensionConstructor
 } from '@mrpullen/spfx-extensibility';
 import { scopeCssClasses } from '../../webparts/handlebarsListView/components/scopeCssClasses';
-import { ExtensibilityService } from '../../webparts/handlebarsListView/services';
 
 /**
  * Built-in Handlebars template engine.
@@ -37,15 +38,13 @@ export class HandlebarsTemplateEngine extends TemplateEngineBase {
   public readonly engineId = 'handlebars';
   public readonly engineName = 'Handlebars';
 
-  private _extensibilityService: ExtensibilityService | undefined;
+  /** Live extension instances (tracked for unregister) */
+  private _installedExtensions: EngineExtension[] = [];
+
   /** Unsubscribe callbacks from PageState watchers */
   private _stateUnsubs: (() => void)[] = [];
   /** Delegated click handler bound to the host */
   private _clickHandler: ((e: Event) => void) | undefined;
-
-  public setExtensibilityService(service: ExtensibilityService): void {
-    this._extensibilityService = service;
-  }
 
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   public registerCallbacks(_callbacks: ITemplateEngineCallbacks): void { }
@@ -53,11 +52,6 @@ export class HandlebarsTemplateEngine extends TemplateEngineBase {
   public render(context: ITemplateEngineContext, data: any, host: HTMLElement): void {
     // Clean up previous state bindings before re-render
     this._teardownStateBindings(host);
-
-    // Register all extensibility library Handlebars customizations
-    if (this._extensibilityService) {
-      this._extensibilityService.registerHandlebarsCustomizations(Handlebars);
-    }
 
     // Scope CSS classes in <style> blocks with the web part instance ID
     const scopedTemplate = scopeCssClasses(context.template, context.instanceId);
@@ -94,6 +88,45 @@ export class HandlebarsTemplateEngine extends TemplateEngineBase {
 
   public updateData(_data: any): void {
     // Handlebars is not reactive — a full re-render is required.
+  }
+
+  /**
+   * Return the Handlebars namespace so extensions can register / unregister
+   * helpers, partials, decorators, etc.
+   */
+  public getEngineNamespace(): typeof Handlebars {
+    return Handlebars;
+  }
+
+  /**
+   * Instantiate, filter by `engineId`, and `register()` each extension.
+   * Tracked internally so `uninstallExtensions()` can tear them down.
+   */
+  public installExtensions(extensions: EngineExtensionConstructor[]): void {
+    for (const Ctor of extensions) {
+      if (Ctor.engineId !== this.engineId) continue;
+      try {
+        const instance = new Ctor(this);
+        instance.register();
+        this._installedExtensions.push(instance);
+      } catch (err) {
+        console.error('[HBWP Handlebars] extension register() failed', err);
+      }
+    }
+  }
+
+  /**
+   * Call `unregister()` on every installed extension and clear the list.
+   */
+  public uninstallExtensions(): void {
+    for (const ext of this._installedExtensions) {
+      try {
+        ext.unregister();
+      } catch (err) {
+        console.error('[HBWP Handlebars] extension unregister() failed', err);
+      }
+    }
+    this._installedExtensions = [];
   }
 
   // ── PageState DOM bindings ──
