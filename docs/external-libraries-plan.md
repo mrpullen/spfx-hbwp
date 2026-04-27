@@ -133,7 +133,7 @@ interesting validation because it touches **every** extensibility slot.
 | `src/extensions/components/HbwpRatingElement.ts` | `src/components/HbwpRatingElement.ts` |
 | `src/extensions/components/HbwpRateElement.ts` (legacy single-star) | `src/components/HbwpRateElement.ts` |
 | `src/extensions/components/HbwpLikersDrawerElement.ts` | `src/components/HbwpLikersDrawerElement.ts` |
-| `src/extensions/components/skeletonStyles.ts` | `src/components/skeletonStyles.ts` (shared util) |
+| `src/extensions/components/skeletonStyles.ts` | **Promoted to `@mrpullen/spfx-extensibility`** (see Resolved decisions) |
 | Social Handlebars helpers (heart icons, etc.) in `helpers/socialHelpers.ts` | `src/helpers/socialHelpers.ts` |
 
 ### Library contract
@@ -148,6 +148,7 @@ export class SocialExtensibilityLibrary implements IExtensibilityLibrary {
       { componentName: 'hbwp-likers-drawer',  componentClass: HbwpLikersDrawerElement },
       { componentName: 'hbwp-rate',           componentClass: HbwpRateElement },
       { componentName: 'hbwp-rating',         componentClass: HbwpRatingElement },
+      { componentName: 'hbwp-comments',       componentClass: HbwpCommentsElement },
     ];
   }
 
@@ -155,6 +156,17 @@ export class SocialExtensibilityLibrary implements IExtensibilityLibrary {
     return [{
       adapterId: 'social',
       adapterClass: SocialDataAdapter,
+      // 'write' is correct even though the adapter serves reads.
+      // The capability flag gates *only* whether the pull-loop calls
+      // fetch() on every refresh. 'read' / 'read-write' adapters get
+      // pulled; 'write' adapters do not. Components still call
+      // ctx.executeRead('_social', 'isLiked', …) directly — that path
+      // is on-demand and unaffected by this flag. Social reads are
+      // per-item and lazy, exactly what we want NOT pulled on refresh.
+      // Capability matrix:
+      //   'read'       → pulled on refresh, executeRead, no executeWrite
+      //   'write'      → not pulled, executeRead, executeWrite
+      //   'read-write' → pulled on refresh, executeRead, executeWrite
       capability: 'write',
     }];
   }
@@ -293,12 +305,95 @@ Which is the minimum a HBWP web part needs to load a list and render it.
 
 ---
 
+## Resolved decisions
+
+- **Promote `skeletonStyles.ts` to `@mrpullen/spfx-extensibility`.** Both
+  the social library and any future library (rating displays, persona
+  cards, charts in loading state) benefit from a shared skeleton
+  primitive. Move the file, keep the same exported `ensureSkeletonStyles()`
+  signature, and have both libraries import it. The Fluent-aligned 3s
+  wave + `prefers-reduced-motion` honoring becomes a platform amenity.
+
+- **Ship `<hbwp-comments>` in the social library.** PnPjs exposes the
+  full comment surface on `item.comments`:
+  - List + paged read (`item.comments.top(N)()`, optionally
+    `.expand("replies", "likedBy", "replies/likedBy")`)
+  - Add (`item.comments.add(text | ICommentInfo)`) — supports `@mention`
+    via `mentions: [{ loginName, email, name }]`
+  - Delete (`comment.delete()`)
+  - Reply (`comment.replies.add(text)`)
+  - Load replies (`comment.replies()`)
+  - **Like / unlike a comment** (`comment.like()` / `comment.unlike()`)
+
+  `SocialDataService` adds:
+  - `getComments(siteUrl, listId, itemId, { top, expandReplies, expandLikedBy })`
+  - `addComment(siteUrl, listId, itemId, textOrInfo)` — accepts string or
+    `ICommentInfo` so authors can pass mentions through
+  - `deleteComment(siteUrl, listId, itemId, commentId)`
+  - `replyToComment(siteUrl, listId, itemId, commentId, text)`
+  - `getReplies(siteUrl, listId, itemId, commentId)`
+  - `likeComment(siteUrl, listId, itemId, commentId)`
+  - `unlikeComment(siteUrl, listId, itemId, commentId)`
+
+  `SocialDataAdapter` exposes matching `executeRead` cases (`getComments`,
+  `getReplies`) and `executeWrite` cases (`addComment`, `deleteComment`,
+  `replyToComment`, `likeComment`, `unlikeComment`).
+
+  `<hbwp-comments>` renders a threaded list with:
+  - Avatar + name + relative time per comment
+  - Reply affordance that expands inline
+  - Like button per comment / per reply (heart icon, count, optimistic UI
+    matching `<hbwp-like>`)
+  - Compose box at the top
+  - Paged via the standard pager pattern
+  - `data-resolve="true"` mirrors `<hbwp-like>` so the component fetches
+    on connect
+
+  Like all the social components: optimistic UI on action, no
+  post-action server re-resolve to avoid render flicker; only the
+  initial connect fetch and explicit user-driven page changes touch the
+  server.
+
+  **Note**: PnPjs documents the comments APIs as **BETA** and "may not
+  work on all tenants." Ship `<hbwp-comments>` with a feature-detect
+  fallback that hides the component cleanly if the endpoint returns
+  401/404, and document the BETA caveat in the library README.
+
+- **Fluent v2 vs v3.** Your read — "v2 has more components than v3" —
+  was true around 2023 but is no longer accurate. As of master today,
+  `@fluentui/web-components` v3 ships ~45 components: accordion,
+  anchor-button, avatar, badge, button, checkbox, combobox,
+  compound-button, counter-badge, dialog, drawer, dropdown, field,
+  image, label, link, listbox, menu, menu-button, menu-item, menu-list,
+  message-bar, option, progress-bar, radio, radio-group, rating-display,
+  select, slider, spinner, split-button, switch, tab, tablist, text,
+  text-input, textarea, toggle-button, tooltip, tree. **The v3 set
+  covers everything we currently use** (button, checkbox, dialog, field,
+  input/text-input, menu, select, textarea, drawer, tablist, tooltip,
+  rating-display) and adds primitives we'd want anyway (`rating-display`
+  fits our `<hbwp-rating>` story; `field` cleans up form layout;
+  `message-bar` covers the Fab 40 Message Bar template).
+
+  **Decision:** target v3. Notable migration deltas to plan for in the
+  Fluent library:
+  - Bootstrap is now `setTheme(webLightTheme)` from `@fluentui/tokens`
+    instead of `provideFluentDesignSystem().register(allComponents)`.
+  - Per-component registration: `import '@fluentui/web-components/button.js'`
+    or `ButtonDefinition.define(FluentDesignSystem.registry)`. Lets us
+    bundle only the components our wrappers actually use — a real
+    win over v2's all-or-nothing register.
+  - `Carousel` is **not** in v3. Replace with our own `<hbwp-carousel>`
+    on top of Swiper (already on the Fab 40 plan), or drop the carousel
+    bootstrap entirely.
+  - `<fluent-text-field>` is now `<fluent-text-input>` plus `<fluent-field>`
+    for label/error layout. Update `HbwpInputElement` accordingly.
+  - `<fluent-tabs>` / `<fluent-tab-panel>` were removed in favor of
+    `<fluent-tablist>` + `<fluent-tab>`. If we ever wrap them, use the
+    new shape.
+
+  Net: targeting v3 is the right call. It also lets us drop ~300 KB of
+  components we don't use thanks to per-component imports.
+
 ## Open questions
 
-- Should `skeletonStyles.ts` move into `@mrpullen/spfx-extensibility` so any
-  library can use it without duplicating CSS?
-- Do we want a `<hbwp-comments>` element in the social library too? PnPjs
-  already exposes `item.comments`, and we have working `executeRead` plumbing
-  to make it real.
-- Fluent v3 vs v2 — `@fluentui/web-components` is currently v2; should
-  extraction align with the v3 migration that's pending in the SPFx ecosystem?
+- _(none currently — prior open questions resolved above)_
