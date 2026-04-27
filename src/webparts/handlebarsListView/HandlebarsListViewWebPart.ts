@@ -81,6 +81,8 @@ export interface IHandlebarsListViewWebPartProps {
    *   sub{i}Enabled — toggle
    */
   topicSubscriptionCount: number;
+  /** Enable verbose extensibility debug logging in the browser console */
+  debugLogging: boolean;
   // Dynamic properties for data sources and HTTP endpoints will be added at runtime
   [key: string]: any;
 }
@@ -189,6 +191,16 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
     if (/^sub\d+(Topic|Alias|Enabled)$/.test(propertyPath)) {
       this.refreshTopicSubscriptions();
       this.render();
+    }
+
+    // Extensibility library field changed → reload libraries
+    if (/^ext\d+Id$/.test(propertyPath) && newValue !== oldValue) {
+      this.loadExtensibilityLibraries().then(() => { this.context.propertyPane.refresh(); this.render(); }).catch(err => console.error('Error reloading extensibility libraries:', err));
+    }
+
+    // Debug logging toggle changed → sync to service immediately
+    if (propertyPath === 'debugLogging') {
+      this.extensibilityService.debug = !!newValue;
     }
 
     // Library template picker changed → copy template content to inline editor
@@ -346,6 +358,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
    * Builds the extensibility library configs from property pane fields and loads them.
    */
   private async loadExtensibilityLibraries(): Promise<void> {
+    this.extensibilityService.debug = !!this.properties.debugLogging;
     const configs = this.buildExtensibilityLibraryConfigs();
     // Always call loadLibraries — even with zero external configs it seeds
     // `_libraries` from the registered built-in libraries so their adapters
@@ -1261,7 +1274,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
                   text: 'Reload Libraries',
                   buttonType: PropertyPaneButtonType.Normal,
                   onClick: () => {
-                    this.loadExtensibilityLibraries().then(() => this.render()).catch(err => console.error('Error reloading extensibility libraries:', err));
+                    this.loadExtensibilityLibraries().then(() => { this.context.propertyPane.refresh(); this.render(); }).catch(err => console.error('Error reloading extensibility libraries:', err));
                   }
                 }),
                 PropertyPaneLabel('extHelp', {
@@ -1300,6 +1313,27 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
               ]
             },
             ...topicSubscriptionGroups
+          ]
+        },
+        {
+          header: {
+            description: 'Developer settings for troubleshooting and diagnostics.'
+          },
+          groups: [
+            {
+              groupName: 'Debug',
+              groupFields: [
+                PropertyPaneToggle('debugLogging', {
+                  label: 'Debug Logging',
+                  onText: 'On',
+                  offText: 'Off',
+                  checked: this.properties.debugLogging ?? false
+                }),
+                PropertyPaneLabel('debugHelp', {
+                  text: 'When enabled, detailed extensibility pipeline logs are written to the browser console (F12). Disable for production use.'
+                })
+              ]
+            }
           ]
         }
       ]

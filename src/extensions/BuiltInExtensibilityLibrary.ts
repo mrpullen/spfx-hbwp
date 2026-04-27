@@ -27,10 +27,6 @@ import {
   HbwpCheckboxElement,
   HbwpHiddenElement,
   HbwpSubmitElement,
-  HbwpLikeElement,
-  HbwpLikersDrawerElement,
-  HbwpRateElement,
-  HbwpRatingElement,
   HbwpActionElement,
   HbwpPagerElement
 } from './components';
@@ -39,7 +35,6 @@ import {
   SharePointListAdapter,
   PageDataAdapter,
   UserProfileAdapter,
-  SocialDataAdapter,
   FormSubmitAdapter,
   HttpDataAdapter
 } from './adapters';
@@ -67,10 +62,6 @@ export class BuiltInExtensibilityLibrary implements IExtensibilityLibrary {
       { componentName: 'hbwp-checkbox', componentClass: HbwpCheckboxElement },
       { componentName: 'hbwp-hidden', componentClass: HbwpHiddenElement },
       { componentName: 'hbwp-submit', componentClass: HbwpSubmitElement },
-      { componentName: 'hbwp-like', componentClass: HbwpLikeElement },
-      { componentName: 'hbwp-likers-drawer', componentClass: HbwpLikersDrawerElement },
-      { componentName: 'hbwp-rate', componentClass: HbwpRateElement },
-      { componentName: 'hbwp-rating', componentClass: HbwpRatingElement },
       { componentName: 'hbwp-action', componentClass: HbwpActionElement },
       { componentName: 'hbwp-pager', componentClass: HbwpPagerElement },
     ];
@@ -132,7 +123,6 @@ export class BuiltInExtensibilityLibrary implements IExtensibilityLibrary {
       { adapterId: 'sharepoint-list', adapterName: 'SharePoint List',          capability: 'read',       adapterClass: SharePointListAdapter },
       { adapterId: 'sharepoint-page', adapterName: 'SharePoint Page',          capability: 'read',       adapterClass: PageDataAdapter },
       { adapterId: 'user-profile',    adapterName: 'User Profile',             capability: 'read',       adapterClass: UserProfileAdapter },
-      { adapterId: 'social',          adapterName: 'Social (Likes & Ratings)', capability: 'write',      adapterClass: SocialDataAdapter },
       { adapterId: 'form-submit',     adapterName: 'Form Submit',              capability: 'write',      adapterClass: FormSubmitAdapter },
       { adapterId: 'http',            adapterName: 'HTTP Endpoint',            capability: 'read-write', adapterClass: HttpDataAdapter },
     ];

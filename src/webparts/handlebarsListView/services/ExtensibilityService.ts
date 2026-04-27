@@ -20,6 +20,13 @@ export class ExtensibilityService {
   private _libraries: IExtensibilityLibrary[] = [];
   private _componentDefinitions: IComponentDefinition<any>[] = [];
   private _registeredElements: Set<string> = new Set();
+  private _debug = false;
+
+  public get debug(): boolean { return this._debug; }
+  public set debug(value: boolean) { this._debug = value; }
+
+  private log(...args: any[]): void { if (this._debug) console.log(...args); }
+  private logWarn(...args: any[]): void { if (this._debug) console.warn(...args); }
 
   /**
    * Registers a built-in (non-SPFx-loaded) library so it participates in
@@ -28,7 +35,7 @@ export class ExtensibilityService {
    */
   public registerBuiltInLibrary(library: IExtensibilityLibrary): void {
     this._builtInLibraries.push(library);
-    console.log(`[HBWP Extensibility] Registered built-in library: ${library.name()}`);
+    this.log(`[HBWP Extensibility] Registered built-in library: ${library.name()}`);
   }
 
   /**
@@ -38,24 +45,37 @@ export class ExtensibilityService {
    * tenant or site-collection app catalog.
    */
   public async loadLibraries(configs: IExtensibilityLibraryConfig[]): Promise<void> {
+    this.log(`[HBWP Extensibility] loadLibraries called with ${configs.length} config(s):`, JSON.stringify(configs));
     // Reset external libraries but preserve built-in ones
     this._libraries = [...this._builtInLibraries];
     this._componentDefinitions = [];
+    this.log(`[HBWP Extensibility] Built-in libraries: ${this._builtInLibraries.map(l => l.name()).join(', ')}`);
 
     const enabledConfigs = configs.filter(c => c.enabled);
-    if (enabledConfigs.length === 0) return;
+    this.log(`[HBWP Extensibility] Enabled configs: ${enabledConfigs.length}`);
+    if (enabledConfigs.length === 0) {
+      this.log('[HBWP Extensibility] No enabled configs — skipping external load');
+      return;
+    }
 
     for (const config of enabledConfigs) {
+      this.log(`[HBWP Extensibility] Loading library: id="${config.id}", name="${config.name}", enabled=${config.enabled}`);
       try {
         const library = await this.resolveLibrary(config.id);
         if (library) {
           this._libraries.push(library);
-          console.log(`[HBWP Extensibility] Loaded library: ${library.name()} (${config.id})`);
+          this.log(`[HBWP Extensibility] ✓ Loaded library: ${library.name()} (${config.id})`);
+          this.log(`[HBWP Extensibility]   - Components: ${library.getCustomWebComponents().map(c => c.componentName).join(', ')}`);
+          this.log(`[HBWP Extensibility]   - Templates: ${(library.getTemplates?.() ?? []).map(t => t.id).join(', ') || '(none)'}`);
+          this.log(`[HBWP Extensibility]   - Adapters: ${(library.getDataAdapters?.() ?? []).map(a => a.adapterId).join(', ') || '(none)'}`);
+        } else {
+          this.logWarn(`[HBWP Extensibility] ✗ resolveLibrary returned undefined for ${config.id}`);
         }
       } catch (error) {
-        console.error(`[HBWP Extensibility] Failed to load library ${config.id}:`, error);
+        console.error(`[HBWP Extensibility] ✗ Failed to load library ${config.id}:`, error);
       }
     }
+    this.log(`[HBWP Extensibility] Total libraries after load: ${this._libraries.length}`);
   }
 
   /**
@@ -73,7 +93,7 @@ export class ExtensibilityService {
             }
             this._registeredElements.add(comp.componentName);
             this._componentDefinitions.push(comp);
-            console.log(`[HBWP Extensibility] Registered web component: <${comp.componentName}>`);
+            this.log(`[HBWP Extensibility] Registered web component: <${comp.componentName}>`);
           }
         }
       } catch (error) {
@@ -143,7 +163,7 @@ export class ExtensibilityService {
             if (!seen.has(def.engineId)) {
               seen.add(def.engineId);
               definitions.push(def);
-              console.log(`[HBWP Extensibility] Registered template engine: ${def.engineName} (${def.engineId}) from ${lib.name()}`);
+              this.log(`[HBWP Extensibility] Registered template engine: ${def.engineName} (${def.engineId}) from ${lib.name()}`);
             }
           }
         }
@@ -163,7 +183,7 @@ export class ExtensibilityService {
     const definitions = this.getTemplateEngineDefinitions();
     const def = definitions.find(d => d.engineId === engineId);
     if (!def) {
-      console.warn(`[HBWP Extensibility] No template engine found with id: ${engineId}`);
+      this.logWarn(`[HBWP Extensibility] No template engine found with id: ${engineId}`);
       return undefined;
     }
     return new def.engineClass();
@@ -204,29 +224,46 @@ export class ExtensibilityService {
    */
   private async resolveLibrary(manifestId: string): Promise<IExtensibilityLibrary | undefined> {
     try {
+      this.log(`[HBWP Extensibility] resolveLibrary: importing SPComponentLoader...`);
       // Use the SPFx SPComponentLoader which is available globally at runtime
       const { SPComponentLoader } = await import(
         /* webpackChunkName: "sp-loader" */
         '@microsoft/sp-loader'
       );
+      this.log(`[HBWP Extensibility] resolveLibrary: SPComponentLoader loaded, calling loadComponentById("${manifestId}")...`);
 
       const lib: any = await SPComponentLoader.loadComponentById(manifestId);
+      this.log(`[HBWP Extensibility] resolveLibrary: loadComponentById returned:`, typeof lib, lib);
+      this.log(`[HBWP Extensibility] resolveLibrary: lib keys:`, lib ? Object.keys(lib) : 'null/undefined');
+      this.log(`[HBWP Extensibility] resolveLibrary: lib.default =`, lib?.default, typeof lib?.default);
 
       // The library module default export (or the module itself) should
       // implement IExtensibilityLibrary
-      const instance: IExtensibilityLibrary =
-        lib.default ? new lib.default() :
-        typeof lib === 'function' ? new lib() :
-        lib;
+      let instance: IExtensibilityLibrary;
+      if (lib.default) {
+        this.log(`[HBWP Extensibility] resolveLibrary: using lib.default (new lib.default())`);
+        instance = new lib.default();
+      } else if (typeof lib === 'function') {
+        this.log(`[HBWP Extensibility] resolveLibrary: lib is a function, calling new lib()`);
+        instance = new lib();
+      } else {
+        this.log(`[HBWP Extensibility] resolveLibrary: using lib directly as instance`);
+        instance = lib;
+      }
+
+      this.log(`[HBWP Extensibility] resolveLibrary: instance type =`, typeof instance);
+      this.log(`[HBWP Extensibility] resolveLibrary: instance.name =`, typeof instance?.name, instance?.name?.toString?.().substring(0, 100));
+      this.log(`[HBWP Extensibility] resolveLibrary: instance.getCustomWebComponents =`, typeof instance?.getCustomWebComponents);
 
       if (instance && typeof instance.getCustomWebComponents === 'function' && typeof instance.name === 'function') {
+        this.log(`[HBWP Extensibility] resolveLibrary: ✓ instance passes IExtensibilityLibrary check`);
         return instance;
       }
 
-      console.warn(`[HBWP Extensibility] Library ${manifestId} does not implement IExtensibilityLibrary`);
+      this.logWarn(`[HBWP Extensibility] ✗ Library ${manifestId} does not implement IExtensibilityLibrary. Instance keys:`, instance ? Object.keys(instance) : 'null', 'prototype:', instance ? Object.getOwnPropertyNames(Object.getPrototypeOf(instance)) : 'N/A');
       return undefined;
     } catch (error) {
-      console.error(`[HBWP Extensibility] SPComponentLoader failed for ${manifestId}:`, error);
+      console.error(`[HBWP Extensibility] ✗ SPComponentLoader failed for ${manifestId}:`, error);
       return undefined;
     }
   }
