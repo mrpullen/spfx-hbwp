@@ -29,7 +29,9 @@ import {
   HbwpHiddenElement,
   HbwpSubmitElement,
   HbwpLikeElement,
+  HbwpLikersDrawerElement,
   HbwpRateElement,
+  HbwpRatingElement,
   HbwpActionElement,
   HbwpPagerElement
 } from './components';
@@ -65,7 +67,9 @@ export class BuiltInExtensibilityLibrary implements IExtensibilityLibrary {
       { componentName: 'hbwp-hidden', componentClass: HbwpHiddenElement },
       { componentName: 'hbwp-submit', componentClass: HbwpSubmitElement },
       { componentName: 'hbwp-like', componentClass: HbwpLikeElement },
+      { componentName: 'hbwp-likers-drawer', componentClass: HbwpLikersDrawerElement },
       { componentName: 'hbwp-rate', componentClass: HbwpRateElement },
+      { componentName: 'hbwp-rating', componentClass: HbwpRatingElement },
       { componentName: 'hbwp-action', componentClass: HbwpActionElement },
       { componentName: 'hbwp-pager', componentClass: HbwpPagerElement },
     ];

@@ -26,6 +26,11 @@ export interface IListFetchConfig {
   camlFilter?: string;
   /** Optional paging token (NextHref/PrevHref value) for requesting a specific page. */
   pagingToken?: string;
+  /** Optional cache namespace prefix. When set, the cache key is scoped to
+   *  this value (typically the web part instanceId), giving each web part
+   *  its own cache slot for the same list+view+filter. Omit for the default
+   *  shared (page-global) cache. */
+  cacheScope?: string;
 }
 
 /**
@@ -82,8 +87,9 @@ export class ListDataService {
   /**
    * Generates a unique cache key for a list/view/filter combination
    */
-  public getCacheKey(siteUrl: string, listId: string, viewId: string, camlFilter?: string, pagingToken?: string): string {
-    const base = `${siteUrl}_${listId}_${viewId}${camlFilter ? `_${camlFilter}` : ''}${pagingToken ? `_page_${pagingToken}` : ''}`;
+  public getCacheKey(siteUrl: string, listId: string, viewId: string, camlFilter?: string, pagingToken?: string, cacheScope?: string): string {
+    const scopePrefix = cacheScope ? `${cacheScope}_` : '';
+    const base = `${scopePrefix}${siteUrl}_${listId}_${viewId}${camlFilter ? `_${camlFilter}` : ''}${pagingToken ? `_page_${pagingToken}` : ''}`;
     return `list_${btoa(base).replace(/[=+/]/g, '_')}`;
   }
 
@@ -104,17 +110,19 @@ export class ListDataService {
     // Paged data is sequential/ephemeral; caching individual pages causes stale hits.
     const isPaged = !!config.pagingToken;
 
-    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, config.camlFilter, config.pagingToken);
+    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, config.camlFilter, config.pagingToken, config.cacheScope);
 
     try {
       if (this.cacheEnabled && !isPaged) {
         // Check if we have cached data first (page 1 only)
         const cachedResult = this.cacheService.get<IListDataResult>(cacheKey);
         if (cachedResult !== undefined) {
+          console.log('[ListDataService] CACHE HIT', cacheKey, '→', cachedResult.items?.length, 'items');
           return { ...cachedResult, fromCache: true };
         }
 
         // Fetch fresh data and cache it
+        console.log('[ListDataService] CACHE MISS', cacheKey, '→ fetching');
         const result = await this.fetchFromSharePoint(siteUrl, listId, viewId, config.camlFilter, config.viewXml, config.pagingToken);
         this.cacheService.set(cacheKey, result, effectiveTimeout);
         return result;
@@ -171,7 +179,7 @@ export class ListDataService {
    */
   public async refreshListData(config: IListFetchConfig): Promise<IListDataResult> {
     const { siteUrl, listId, viewId } = config;
-    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, config.camlFilter);
+    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, config.camlFilter, undefined, config.cacheScope);
 
     // Remove from cache first
     this.cacheService.remove(cacheKey);
@@ -190,16 +198,16 @@ export class ListDataService {
   /**
    * Clears cached data for a specific list
    */
-  public clearListCache(siteUrl: string, listId: string, viewId: string, camlFilter?: string): void {
-    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, camlFilter);
+  public clearListCache(siteUrl: string, listId: string, viewId: string, camlFilter?: string, cacheScope?: string): void {
+    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, camlFilter, undefined, cacheScope);
     this.cacheService.remove(cacheKey);
   }
 
   /**
    * Checks if data for a list is currently cached
    */
-  public isListCached(siteUrl: string, listId: string, viewId: string, camlFilter?: string): boolean {
-    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, camlFilter);
+  public isListCached(siteUrl: string, listId: string, viewId: string, camlFilter?: string, cacheScope?: string): boolean {
+    const cacheKey = this.getCacheKey(siteUrl, listId, viewId, camlFilter, undefined, cacheScope);
     return this.cacheService.has(cacheKey);
   }
 

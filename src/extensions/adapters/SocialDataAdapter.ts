@@ -83,6 +83,34 @@ export class SocialDataAdapter extends DataAdapterBase {
           : { success: false, error: result.error };
       }
 
+      case 'getLikedBy': {
+        const { siteUrl, listId, itemId, skip, top } = payload || {};
+        if (!siteUrl || !listId || !itemId) {
+          return { success: false, error: 'getLikedBy requires siteUrl, listId, and itemId' };
+        }
+        const result = await this.inner.getLikedBy(
+          siteUrl,
+          listId,
+          Number(itemId),
+          skip !== null && skip !== undefined ? Number(skip) : 0,
+          top !== null && top !== undefined ? Number(top) : 25
+        );
+        return result.success
+          ? { success: true, data: { users: result.users, total: result.total, skip: result.skip, top: result.top } }
+          : { success: false, error: result.error };
+      }
+
+      case 'getRating': {
+        const { siteUrl, listId, itemId } = payload || {};
+        if (!siteUrl || !listId || !itemId) {
+          return { success: false, error: 'getRating requires siteUrl, listId, and itemId' };
+        }
+        const result = await this.inner.getRating(siteUrl, listId, Number(itemId));
+        return result.success
+          ? { success: true, data: { average: result.average, count: result.count, userRating: result.userRating } }
+          : { success: false, error: result.error };
+      }
+
       default:
         return { success: false, error: `Unknown social read operation: ${operation}` };
     }

@@ -109,12 +109,20 @@ export class DataAdapterPipeline {
     bus: IMessageBus,
     baseContextProvider: () => Omit<IDataAdapterContext, 'config'>
   ): Promise<void> {
+    // Resolve instanceId once so we can namespace adapter bus topics. This
+    // keeps two web parts on the same page from cross-talking on shared
+    // adapter keys (e.g. both have a primary `items` adapter). User-defined
+    // topics (data-hbwp-topic in templates) remain page-global.
+    const baseCtx = baseContextProvider();
+    const instanceId = baseCtx.instanceId;
+    const ns = (k: string): string => `${instanceId}::${k}`;
+
     // Hook every adapter into the bus.  The base class sets up its own
     // subscriptions for UI verbs and token-discovered dependencies.
     this._instances.forEach((instance, key) => {
       const cfg = this._configs.get(key);
       if (!cfg) return;
-      instance.onAttach(bus, key, cfg, baseContextProvider);
+      instance.onAttach(bus, ns(key), cfg, baseContextProvider);
     });
 
     // Initial fetch wave — topo-sorted so dependencies land first.

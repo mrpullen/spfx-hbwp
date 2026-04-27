@@ -73,6 +73,14 @@ export interface IHandlebarsListViewWebPartProps {
   extensibilityLibraries: IExtensibilityLibraryConfig[];
   /** Number of extensibility library entries */
   extensibilityLibraryCount: number;
+  /**
+   * Number of MessageBus topic subscriptions.
+   * For each i in [0, topicSubscriptionCount):
+   *   sub{i}Topic   — bus topic to listen on (e.g. "selectedItem")
+   *   sub{i}Alias   — template-data key the payload is exposed under (e.g. "incoming")
+   *   sub{i}Enabled — toggle
+   */
+  topicSubscriptionCount: number;
   // Dynamic properties for data sources and HTTP endpoints will be added at runtime
   [key: string]: any;
 }
@@ -93,6 +101,10 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
   private _selectedItem: Record<string, any> | undefined;
   /** Last filter context — exposed via IDynamicDataCallables */
   private _filterContext: Record<string, any> | undefined;
+  /** Latest payload received per configured topic alias (forwarded to the React component as `topicData`) */
+  private _topicInbox: Record<string, any> = {};
+  /** Active bus unsubscribe callbacks for configured topic subscriptions */
+  private _topicUnsubs: Array<() => void> = [];
 
   // ── IDynamicDataCallables ──
 
@@ -169,6 +181,12 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
         this.fetchAndStoreViewXml(siteUrl, listId, newValue, `ds${i}ViewXml`, `ds${i}CamlFilter`)
           .catch(err => console.error(`Error fetching view XML for ds${i}:`, err));
       }
+    }
+
+    // Topic subscription field changed → re-wire bus subscriptions and re-render
+    if (/^sub\d+(Topic|Alias|Enabled)$/.test(propertyPath)) {
+      this.refreshTopicSubscriptions();
+      this.render();
     }
   }
 
@@ -254,6 +272,9 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
     if (this.properties.extensibilityLibraryCount === undefined) {
       this.properties.extensibilityLibraryCount = 0;
     }
+    if (this.properties.topicSubscriptionCount === undefined) {
+      this.properties.topicSubscriptionCount = 0;
+    }
     if (!this.properties.templateEngine) {
       this.properties.templateEngine = 'handlebars';
     }
@@ -263,8 +284,45 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
 
     // Load external extensibility libraries
     await this.loadExtensibilityLibraries();
-    
+
+    // Wire up MessageBus topic subscriptions
+    this.refreshTopicSubscriptions();
+
     return super.onInit();
+  }
+
+  /**
+   * Tears down any existing topic-bus subscriptions and rebuilds them from
+   * the current property pane configuration. Called on web part init and
+   * whenever the topic-subscriptions config is added/removed/toggled.
+   */
+  private refreshTopicSubscriptions(): void {
+    // Unsubscribe everything first
+    this._topicUnsubs.forEach(fn => { try { fn(); } catch (_e) { /* ignore */ } });
+    this._topicUnsubs = [];
+    this._topicInbox = {};
+
+    const count = this.properties.topicSubscriptionCount || 0;
+    for (let i = 0; i < count; i++) {
+      const topic = (this.properties[`sub${i}Topic`] as string || '').trim();
+      const alias = (this.properties[`sub${i}Alias`] as string || '').trim() || topic;
+      const enabled = this.properties[`sub${i}Enabled`] !== false;
+      if (!topic || !enabled) continue;
+
+      // Seed inbox with the bus's last-known message for this topic so a fresh
+      // render picks up state published before we subscribed.
+      const last = this._messageBus.lastMessage(topic);
+      if (last) {
+        this._topicInbox[alias] = (last.data && (last.data.item ?? last.data)) || {};
+      }
+
+      const unsub = this._messageBus.subscribe(topic, (envelope) => {
+        const payload = envelope?.data && (envelope.data.item ?? envelope.data);
+        this._topicInbox = { ...this._topicInbox, [alias]: payload || {} };
+        this.render();
+      });
+      this._topicUnsubs.push(unsub);
+    }
   }
 
   /**
@@ -333,6 +391,55 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
             onText: 'On',
             offText: 'Off',
             checked: this.properties[`ext${i}Enabled`] !== false
+          })
+        ]
+      });
+    }
+    return groups;
+  }
+
+  // ── Topic subscriptions (MessageBus) ────────────────────────────────────
+
+  private addTopicSubscription(): void {
+    this.properties.topicSubscriptionCount = (this.properties.topicSubscriptionCount || 0) + 1;
+    this.context.propertyPane.refresh();
+  }
+
+  private removeTopicSubscription(): void {
+    if ((this.properties.topicSubscriptionCount || 0) > 0) {
+      const i = this.properties.topicSubscriptionCount - 1;
+      delete this.properties[`sub${i}Topic`];
+      delete this.properties[`sub${i}Alias`];
+      delete this.properties[`sub${i}Enabled`];
+      this.properties.topicSubscriptionCount--;
+      this.context.propertyPane.refresh();
+      this.refreshTopicSubscriptions();
+      this.render();
+    }
+  }
+
+  private buildTopicSubscriptionPropertyGroups(): IPropertyPaneGroup[] {
+    const groups: IPropertyPaneGroup[] = [];
+    const count = this.properties.topicSubscriptionCount || 0;
+    for (let i = 0; i < count; i++) {
+      groups.push({
+        groupName: `Subscription ${i + 1}`,
+        groupFields: [
+          PropertyPaneTextField(`sub${i}Topic`, {
+            label: 'Bus Topic',
+            description: 'Topic name to listen on (e.g. "selectedItem")',
+            value: this.properties[`sub${i}Topic`] || ''
+          }),
+          PropertyPaneTextField(`sub${i}Alias`, {
+            label: 'Template Alias',
+            description: 'Key under which payload is exposed to the template (e.g. "incoming")',
+            value: this.properties[`sub${i}Alias`] || ''
+          }),
+          PropertyPaneToggle(`sub${i}Enabled`, {
+            label: 'Enabled',
+            onText: 'On',
+            offText: 'Off',
+            checked: this.properties[`sub${i}Enabled`] !== false
           })
         ]
       });
@@ -638,6 +745,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
         messageBus: this._messageBus,
         incomingItem,
         incomingItems,
+        topicData: this._topicInbox,
         platformServices,
         adapterConfigs
       }
@@ -662,6 +770,9 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
   }
 
   protected onDispose(): void {
+    // Tear down topic-bus subscriptions
+    this._topicUnsubs.forEach(fn => { try { fn(); } catch (_e) { /* ignore */ } });
+    this._topicUnsubs = [];
     ReactDom.unmountComponentAtNode(this.domElement);
   }
 
@@ -826,6 +937,7 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
     const httpEndpointGroups = this.buildHttpEndpointPropertyGroups();
     const submitEndpointGroups = this.buildSubmitEndpointPropertyGroups();
     const extensibilityGroups = this.buildExtensibilityPropertyGroups();
+    const topicSubscriptionGroups = this.buildTopicSubscriptionPropertyGroups();
     
     return {
       pages: [
@@ -1107,6 +1219,36 @@ export default class HandlebarsListViewWebPart extends BaseClientSideWebPart<IHa
               ]
             },
             ...extensibilityGroups
+          ]
+        },
+        {
+          header: {
+            description: 'Subscribe to MessageBus topics published by other web parts on the page. Each subscription exposes the latest payload to the Handlebars template under the configured alias key.'
+          },
+          groups: [
+            {
+              groupName: 'Subscribe Topics',
+              groupFields: [
+                PropertyPaneLabel('subInfo', {
+                  text: `You have ${this.properties.topicSubscriptionCount || 0} topic subscription(s) configured.`
+                }),
+                PropertyPaneButton('addTopicSubscription', {
+                  text: 'Add Subscription',
+                  buttonType: PropertyPaneButtonType.Primary,
+                  onClick: this.addTopicSubscription.bind(this)
+                }),
+                PropertyPaneButton('removeTopicSubscription', {
+                  text: 'Remove Last Subscription',
+                  buttonType: PropertyPaneButtonType.Normal,
+                  onClick: this.removeTopicSubscription.bind(this),
+                  disabled: (this.properties.topicSubscriptionCount || 0) === 0
+                }),
+                PropertyPaneLabel('subHelp', {
+                  text: 'Example: topic="selectedItem" alias="incoming" — your template can then read {{incoming.Title}} when another web part publishes on that topic.'
+                })
+              ]
+            },
+            ...topicSubscriptionGroups
           ]
         }
       ]

@@ -113,6 +113,13 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     };
     registerServiceContext(ctx);
 
+    // Attach delegated event listeners directly on the container — done
+    // BEFORE the pipeline attach awaits so that even slow / failing adapter
+    // fetches don't prevent template interactions from being wired up.
+    if (this.containerRef.current) {
+      this.containerRef.current.addEventListener('click', this.handleContainerClick);
+    }
+
     // Subscribe to each adapter's data-changed envelope; attach pipeline to bus.
     this.subscribeToAdapterResults();
     if (this._pipeline && this.props.messageBus) {
@@ -120,11 +127,6 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     } else {
       // No message bus → render whatever scaffold exists
       await this.renderTemplate();
-    }
-
-    // Attach delegated event listeners directly on the container.
-    if (this.containerRef.current) {
-      this.containerRef.current.addEventListener('click', this.handleContainerClick);
     }
   }
 
@@ -170,13 +172,14 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     if (actionEl) {
       const action = actionEl.getAttribute('data-hbwp-action');
       const topic = actionEl.getAttribute('data-hbwp-topic');
+      console.log('[HBWP] click → action=%s topic=%s busPresent=%s', action, topic, !!this.props.messageBus);
       if (action && topic && this.props.messageBus) {
         let item: Record<string, any> | undefined;
         let items: Record<string, any>[] | undefined;
         const itemJson = actionEl.getAttribute('data-hbwp-item');
         const itemsJson = actionEl.getAttribute('data-hbwp-items');
-        try { if (itemJson) item = JSON.parse(itemJson); } catch (_e) { /* ignore bad JSON */ }
-        try { if (itemsJson) items = JSON.parse(itemsJson); } catch (_e) { /* ignore bad JSON */ }
+        try { if (itemJson) item = JSON.parse(itemJson); } catch (e) { console.warn('[HBWP] bad data-hbwp-item JSON', e); }
+        try { if (itemsJson) items = JSON.parse(itemsJson); } catch (e) { console.warn('[HBWP] bad data-hbwp-items JSON', e); }
 
         const envelope: IMessageEnvelope = {
           topic,
@@ -185,6 +188,7 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
           action: action as IMessageEnvelope['action'],
           data: { ...(item !== undefined ? { item } : {}), ...(items !== undefined ? { items } : {}) }
         };
+        console.log('[HBWP] publishing envelope', envelope);
         this.props.messageBus.publish(envelope);
       }
     }
@@ -272,6 +276,41 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     } else if (prevProps.template !== this.props.template) {
       // Template only — re-render with existing data
       await this.renderTemplate();
+    } else if (JSON.stringify(prevProps.topicData) !== JSON.stringify(this.props.topicData)) {
+      // Bus topic subscription payload changed — re-fetch any read adapters
+      // (their CAML filters / URLs may reference {{aliasKey.*}} tokens). The
+      // resulting data-changed envelope will trigger a debounced render.
+      // Only render here when there are no read adapters; otherwise we'd
+      // paint stale data, then paint again when the adapter resolves.
+      console.log('[HBWP %s] topicData changed → requesting adapter refresh', this.props.instanceId, this.props.topicData);
+      const hasReadAdapters = (this.props.adapterConfigs || []).some(c => !c.key.startsWith('_'));
+      this.requestAdapterRefresh();
+      if (!hasReadAdapters) {
+        await this.renderTemplate();
+      }
+    }
+  }
+
+  /**
+   * Publishes a `refresh-requested` envelope for every configured read
+   * adapter so they re-fetch with the current resolvedData (e.g. after a
+   * subscribed topic payload changes).
+   */
+  private requestAdapterRefresh(): void {
+    if (!this.props.messageBus || !this.props.adapterConfigs) return;
+    const bus = this.props.messageBus;
+    const myId = this.props.instanceId;
+    for (const cfg of this.props.adapterConfigs) {
+      if (cfg.key.startsWith('_')) continue; // skip write-only adapters
+      const topic = `${myId}::${cfg.key}`;
+      console.log('[HBWP %s] publishing refresh-requested on %s', myId, topic);
+      bus.publish({
+        topic,
+        source: myId,
+        timestamp: Date.now(),
+        action: 'refresh-requested',
+        data: {}
+      });
     }
   }
 
@@ -280,16 +319,29 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
   /**
    * Subscribe to the `data-changed` envelope on every read adapter's topic.
    * Each result lands in `_adapterResults` and triggers a debounced re-render.
+   *
+   * IMPORTANT: adapter topics are namespaced by instanceId
+   * (`${instanceId}::${key}`) so two web parts on the same page with
+   * overlapping adapter keys don't cross-pollute. That namespacing alone
+   * provides full isolation — no source filter is needed (the adapter
+   * publishes with `source = instanceKey` which includes the namespace).
    */
   private subscribeToAdapterResults(): void {
     if (!this._pipeline || !this.props.messageBus) return;
     const configs = this.props.adapterConfigs || [];
+    const myId = this.props.instanceId;
     for (const cfg of configs) {
       if (cfg.key.startsWith('_')) continue; // skip write-only adapters
-      const unsub = this.props.messageBus.subscribe(cfg.key, (envelope: IMessageEnvelope) => {
+      const topic = `${myId}::${cfg.key}`;
+      const unsub = this.props.messageBus.subscribe(topic, (envelope: IMessageEnvelope) => {
         if (envelope.action !== 'data-changed') return;
         const result = envelope.data?.result;
         if (result) {
+          // Dedupe: if the new result is structurally identical to the
+          // previous one (cache hit re-publishes), skip the re-render to
+          // avoid DOM thrash on web components like <hbwp-like>.
+          const previous = this._adapterResults[cfg.key];
+          if (previous && JSON.stringify(previous) === JSON.stringify(result)) return;
           this._adapterResults[cfg.key] = result as IDataAdapterResult;
           this.scheduleRender();
         }
@@ -352,6 +404,14 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
     const resolvedData: Record<string, any> = {};
     if (this.props.incomingItem) resolvedData.incoming = this.props.incomingItem;
     if (this.props.incomingItems) resolvedData.incomingItems = this.props.incomingItems;
+    // Bus-topic subscriptions land in resolvedData under their alias too, so
+    // CAML filters / HTTP URLs can use tokens like {{incoming.ID}} when an
+    // alias of "incoming" is configured for a subscribed topic.
+    if (this.props.topicData) {
+      for (const k of Object.keys(this.props.topicData)) {
+        resolvedData[k] = this.props.topicData[k];
+      }
+    }
 
     return {
       instanceId: this.props.instanceId,
@@ -501,7 +561,11 @@ export default class HandlebarsListView extends React.Component<IHandlebarsListV
       ...httpData,
       // SPFx Dynamic Data incoming items still surface to the template
       ...(this.props.incomingItem ? { incoming: this.props.incomingItem } : {}),
-      ...(this.props.incomingItems ? { incomingItems: this.props.incomingItems } : {})
+      ...(this.props.incomingItems ? { incomingItems: this.props.incomingItems } : {}),
+      // MessageBus topic subscriptions (configured in property pane) — each
+      // alias is spread at the root level so templates can read e.g.
+      // `{{incoming.Title}}` when alias="incoming" + topic="selectedItem".
+      ...(this.props.topicData || {})
     };
 
     return templateData;

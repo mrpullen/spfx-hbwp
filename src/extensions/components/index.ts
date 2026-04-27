@@ -6,6 +6,8 @@ export { HbwpCheckboxElement } from './HbwpCheckboxElement';
 export { HbwpHiddenElement } from './HbwpHiddenElement';
 export { HbwpSubmitElement } from './HbwpSubmitElement';
 export { HbwpLikeElement } from './HbwpLikeElement';
+export { HbwpLikersDrawerElement } from './HbwpLikersDrawerElement';
 export { HbwpRateElement } from './HbwpRateElement';
+export { HbwpRatingElement } from './HbwpRatingElement';
 export { HbwpActionElement } from './HbwpActionElement';
 export { HbwpPagerElement } from './HbwpPagerElement';

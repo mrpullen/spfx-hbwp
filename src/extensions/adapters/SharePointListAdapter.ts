@@ -39,7 +39,7 @@ export class SharePointListAdapter extends DataAdapterBase {
   public getRequiredServices(): PlatformServiceKey[] { return ['sp']; }
 
   public async fetch(context: IDataAdapterContext): Promise<IDataAdapterResult> {
-    const { siteUrl, listId, viewId, viewXml, camlFilter, cacheTimeoutMinutes } = context.config;
+    const { siteUrl, listId, viewId, viewXml, camlFilter, cacheTimeoutMinutes, cacheIsolation } = context.config;
 
     if (!siteUrl || !listId || !viewId) {
       return { data: [], error: 'SharePoint List adapter requires siteUrl, listId, and viewId' };
@@ -56,6 +56,7 @@ export class SharePointListAdapter extends DataAdapterBase {
         ...(context.resolvedData || {})
       });
     }
+    console.log('[SharePointListAdapter] fetch listId=%s instance=%s resolvedFilter=%s', listId, context.instanceId, resolvedFilter);
 
     const config: IListFetchConfig = {
       siteUrl,
@@ -63,7 +64,12 @@ export class SharePointListAdapter extends DataAdapterBase {
       viewId,
       viewXml,
       camlFilter: resolvedFilter,
-      pagingToken: context.pagingToken
+      pagingToken: context.pagingToken,
+      // When cacheIsolation === true, scope the cache key to this web part's
+      // instanceId so two web parts hitting the same list+view don't share a
+      // cache slot. Default (undefined / false) keeps the original page-global
+      // shared cache for best perf.
+      cacheScope: cacheIsolation ? context.instanceId : undefined
     };
 
     const result = await this.inner.getListData(config, cacheTimeoutMinutes);
@@ -92,6 +98,7 @@ export class SharePointListAdapter extends DataAdapterBase {
       { propertyName: 'viewId',     label: 'View',     type: 'viewPicker', required: true, order: 3 },
       { propertyName: 'camlFilter', label: 'CAML Filter', type: 'multiline', description: 'Optional CAML Where clause. Supports tokens like {{user.email}}, {{page.Id}}.', order: 4 },
       { propertyName: 'cacheTimeoutMinutes', label: 'Cache (minutes)', type: 'slider', defaultValue: 15, description: 'How long to cache results. 0 = disabled.', order: 5 },
+      { propertyName: 'cacheIsolation', label: 'Per-Web-Part Cache', type: 'toggle', defaultValue: false, description: 'OFF (default): cache shared across web parts hitting the same list+view+filter. ON: this web part keeps its own private cache slot.', order: 6 },
     ];
   }
 

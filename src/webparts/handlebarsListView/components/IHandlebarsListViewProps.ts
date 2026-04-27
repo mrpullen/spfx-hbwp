@@ -190,6 +190,13 @@ export interface IHandlebarsListViewProps {
   incomingItem?: Record<string, any>;
   /** SPFx Dynamic Data: incoming items array from a connected source */
   incomingItems?: Record<string, any>[];
+  /**
+   * Bus topic subscriptions resolved values, keyed by alias.
+   * The web part subscribes to configured topics on the page-wide MessageBus
+   * and forwards the latest envelope payload here so templates can read it
+   * via `{{aliasName}}`. See "Subscribe Topics" property pane group.
+   */
+  topicData?: Record<string, any>;
   /** Platform services bag for data adapter DI */
   platformServices?: IPlatformServices;
   /** Data adapter instance configurations */

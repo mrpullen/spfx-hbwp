@@ -29,6 +29,21 @@ const IF_RESOLVED_BLOCK_REGEX = /\{\{#if-resolved\s+([^\s}]+)\s*\}\}([\s\S]*?)\{
 // eslint-disable-next-line @rushstack/security/no-unsafe-regexp
 const TOKEN_REGEX = /\{\{\s*([^\s}]+)\s*\}\}/g;
 
+/** Sentinel left in place of unresolved tokens during substitution. The
+ *  structural-normalization pass drops any leaf comparison whose subtree
+ *  contains this marker, so authors don't have to manually wrap every
+ *  optional clause in `{{#if-resolved}}`. */
+const UNRESOLVED_MARKER = '\u0000HBWP_UNRESOLVED\u0000';
+
+/** Leaf CAML comparison elements that should be dropped if any of their
+ *  tokens resolved empty. Logical wrappers (And/Or/Where) are handled
+ *  separately by the And/Or collapse pass. */
+const LEAF_COMPARISON_TAGS = new Set([
+  'Eq', 'Neq', 'Gt', 'Geq', 'Lt', 'Leq',
+  'BeginsWith', 'Contains', 'Includes', 'NotIncludes',
+  'DateRangesOverlap', 'In', 'Membership'
+]);
+
 /**
  * Walk a dotted path against a context object. Supports array indexing via .0 / [0].
  * Returns undefined if any segment is missing.
@@ -65,12 +80,16 @@ function stripUnresolvedBlocks(template: string, ctx: any): string {
 
 /**
  * Pass 2: Replace remaining `{{token}}` occurrences with the resolved value.
- * Missing tokens become empty string.
+ * Unresolved tokens are replaced with a sentinel marker so structural
+ * normalization can drop the enclosing leaf comparison (auto-guard).
  */
 function substituteTokens(template: string, ctx: any): string {
   return template.replace(TOKEN_REGEX, (_full, key) => {
     const value = resolvePath(ctx, key);
-    return value === undefined || value === null ? '' : String(value);
+    if (value === undefined || value === null || (typeof value === 'string' && value === '')) {
+      return UNRESOLVED_MARKER;
+    }
+    return String(value);
   });
 }
 
@@ -85,15 +104,28 @@ function normalizeStructure(caml: string): string {
     // Wrap in a root so DOMParser doesn't choke on top-level fragments
     xml = new DOMParser().parseFromString(`<root>${caml}</root>`, 'application/xml');
     if (xml.getElementsByTagName('parsererror').length > 0) {
-      // Fall back to original; structural normalization is best-effort
-      return caml;
+      // Fall back to original (with markers stripped); structural
+      // normalization is best-effort.
+      return caml.split(UNRESOLVED_MARKER).join('');
     }
   } catch {
-    return caml;
+    return caml.split(UNRESOLVED_MARKER).join('');
   }
 
   const root = xml.documentElement;
   if (!root) return caml;
+
+  // Drop any leaf comparison element whose subtree contains an unresolved
+  // token marker. This makes `{{#if-resolved}}` optional for the common case
+  // of a single-token <Eq>/<Geq>/<BeginsWith>/etc.
+  const dropUnresolvedLeaves = (el: Element): void => {
+    const childEls = Array.from(el.children);
+    for (const c of childEls) dropUnresolvedLeaves(c);
+    if (LEAF_COMPARISON_TAGS.has(el.tagName) && (el.textContent || '').indexOf(UNRESOLVED_MARKER) >= 0) {
+      el.parentNode?.removeChild(el);
+    }
+  };
+  dropUnresolvedLeaves(root);
 
   // Recursively collapse And/Or
   const collapse = (el: Element): void => {
@@ -131,7 +163,12 @@ function normalizeStructure(caml: string): string {
 
   // Serialize back, stripping the synthetic <root> wrapper
   const serialized = new XMLSerializer().serializeToString(root);
-  return serialized.replace(/^<root[^>]*>/, '').replace(/<\/root>$/, '');
+  // Belt-and-braces: any stray markers (e.g. inside attribute values or
+  // outside a recognised leaf comparison) get replaced with empty string.
+  return serialized
+    .replace(/^<root[^>]*>/, '')
+    .replace(/<\/root>$/, '')
+    .split(UNRESOLVED_MARKER).join('');
 }
 
 /**

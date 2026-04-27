@@ -14,8 +14,8 @@
     - Point at the SAME list as HBWP #1 (siteUrl + listId must match)
       OR leave list config minimal — it just needs the list GUID for the
       social adapter; the row data comes from HBWP #1 via the bus.
-    - Property pane → Dynamic Data → Subscribe Topics:
-        Topic: "selectedItem"   Context Key: "incoming"   On Receive: Merge   Enabled: ✓
+    - Property pane → Subscribe Topics → Add Subscription:
+        Bus Topic: "selectedItem"   Template Alias: "incoming"   Enabled: ✓
 
   What to verify:
     ✓ Before any pick: shows "Waiting for selection" placeholder
@@ -70,16 +70,14 @@
                    data-active-color="#c00"></hbwp-like>
       </div>
 
-      {{!-- Rate — five stars, each writes a different value --}}
+      {{!-- Rate — single web component, half-star precision, hover preview --}}
       <div class="row-{{wpId}}">
         <span class="label-{{wpId}}">Rate</span>
-        <span class="stars-{{wpId}}">
-          <hbwp-rate data-wp-id="{{wpId}}" data-item-id="{{incoming.ID}}" data-value="1" title="1 star">★</hbwp-rate>
-          <hbwp-rate data-wp-id="{{wpId}}" data-item-id="{{incoming.ID}}" data-value="2" title="2 stars">★</hbwp-rate>
-          <hbwp-rate data-wp-id="{{wpId}}" data-item-id="{{incoming.ID}}" data-value="3" title="3 stars">★</hbwp-rate>
-          <hbwp-rate data-wp-id="{{wpId}}" data-item-id="{{incoming.ID}}" data-value="4" title="4 stars">★</hbwp-rate>
-          <hbwp-rate data-wp-id="{{wpId}}" data-item-id="{{incoming.ID}}" data-value="5" title="5 stars">★</hbwp-rate>
-        </span>
+        <hbwp-rating data-wp-id="{{wpId}}"
+                     data-item-id="{{incoming.ID}}"
+                     data-resolve="true"
+                     data-allow-half="true"
+                     data-active-color="#ffb900"></hbwp-rating>
       </div>
 
       <div class="meta-{{wpId}}">
@@ -93,4 +91,8 @@
       <p style="font-size: 12px;">Click a row in HBWP #1 to load like/rate controls here.</p>
     </div>
   {{/if}}
+
+  {{!-- Drawer: listens for "hbwp-likers-requested" events from <hbwp-like>.
+       Click the "N Likes" text on the heart to open the paged list of likers. --}}
+  <hbwp-likers-drawer data-wp-id="{{wpId}}" data-page-size="25"></hbwp-likers-drawer>
 </div>

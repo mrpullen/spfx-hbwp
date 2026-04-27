@@ -41,7 +41,7 @@ export class HbwpPagerElement extends BaseWebComponent {
     // data-topic maps to the data-source key in the property pane.
     // Defaults to 'items' (the primary list) when omitted so templates that
     // page the main list don't need to specify a topic.
-    const topic = this.getAttribute('data-topic') || 'items';
+    const dataTopic = this.getAttribute('data-topic') || 'items';
     if (direction !== 'next' && direction !== 'prev' && direction !== 'first') {
       console.warn('[hbwp-pager] data-direction must be "next", "prev", or "first"');
       return;
@@ -52,6 +52,10 @@ export class HbwpPagerElement extends BaseWebComponent {
       console.warn('[hbwp-pager] No messageBus available in service context');
       return;
     }
+
+    // Adapter topics are namespaced by web-part instanceId so a pager in one
+    // web part never advances another web part's data source.
+    const topic = `${ctx.instanceId}::${dataTopic}`;
 
     // Read the most recent paging token for this topic from the bus
     const last = ctx.messageBus.lastMessage(topic);
